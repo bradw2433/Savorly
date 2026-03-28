@@ -82,13 +82,37 @@ export function useRecipes(user) {
   }, [user])
 
   // Toggle favorite
+  // Toggle favorite — prevents duplicates by checking local recipes list first
   const toggleFavorite = useCallback(async (recipe) => {
     if (!user) return
-    // If recipe has no DB id yet, save it first
+    // Check if already in DB by matching on raw content (for unsaved generated recipes)
     let dbRecipe = recipe
     if (!recipe.created_at) {
-      dbRecipe = await addRecipe(recipe)
-      if (!dbRecipe) return
+      // Check if a matching recipe already exists in local state
+      const existing = recipes.find(r => r.raw === recipe.raw)
+      if (existing) {
+        dbRecipe = existing
+      } else {
+        // Not in DB yet — save it first with is_favorite: true directly
+        const title = extractTitle(recipe.raw)
+        const { data, error } = await supabase
+          .from('hearth_recipes')
+          .insert({
+            user_id: user.id,
+            raw: recipe.raw,
+            title,
+            photos: recipe.photos || [],
+            rating: recipe.rating || 0,
+            is_favorite: true,
+            notes: recipe.notes || '',
+          })
+          .select()
+          .single()
+        if (!error && data) {
+          setRecipes(prev => [data, ...prev])
+        }
+        return
+      }
     }
     const newVal = !dbRecipe.is_favorite
     const { data, error } = await supabase
@@ -101,7 +125,7 @@ export function useRecipes(user) {
     if (!error && data) {
       setRecipes(prev => prev.map(r => r.id === data.id ? data : r))
     }
-  }, [user, addRecipe])
+  }, [user, recipes])
 
   // Delete a recipe
   const deleteRecipe = useCallback(async (id) => {

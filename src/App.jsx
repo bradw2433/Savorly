@@ -11,10 +11,10 @@ fontLink.href = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ita
 document.head.appendChild(fontLink)
 
 const T = {
-  white: '#FAFAF8', offWhite: '#F2F0EB', black: '#111110', charcoal: '#2A2A28',
-  brass: '#B8935A', brassLight: '#D4AD78', brassDark: '#8B6A3E',
-  brassGlow: 'rgba(184,147,90,0.15)', border: 'rgba(184,147,90,0.25)',
-  borderLight: 'rgba(184,147,90,0.12)', muted: '#7A7A72',
+  white: '#FAF8F0', offWhite: '#F0EBE0', black: '#100E0C', charcoal: '#2E2820',
+  brass: '#D4C090', brassLight: '#E4D4A8', brassDark: '#7A6050',
+  brassGlow: 'rgba(212,192,144,0.15)', border: 'rgba(212,192,144,0.28)',
+  borderLight: 'rgba(212,192,144,0.13)', muted: '#8A7E70',
 }
 
 const gs = document.createElement('style')
@@ -38,7 +38,7 @@ gs.textContent = `
     padding: 14px 28px; font-size: 13px; font-weight: 500;
     letter-spacing: .08em; text-transform: uppercase; transition: all .25s;
   }
-  .btn-brass:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(184,147,90,.4); }
+  .btn-brass:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(212,192,144,.4); }
   .btn-brass:active { transform: translateY(0); }
   .btn-brass:disabled { opacity:.5; transform:none; box-shadow:none; cursor:default; }
   .btn-ghost {
@@ -344,7 +344,7 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
         <button onClick={onClose} style={{position:'absolute',top:20,left:20,width:42,height:42,background:'rgba(0,0,0,.55)',backdropFilter:'blur(8px)',border:`1px solid ${T.border}`,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center'}}>
           <Icon name="back" size={18} color={T.white}/>
         </button>
-        <button onClick={()=>onUnfavorite(recipe)} style={{position:'absolute',top:20,right:20,width:42,height:42,background:T.brass,border:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(184,147,90,.5)'}}>
+        <button onClick={()=>onUnfavorite(recipe)} style={{position:'absolute',top:20,right:20,width:42,height:42,background:T.brass,border:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(212,192,144,.5)'}}>
           <Icon name="heartFill" size={18} color={T.white}/>
         </button>
         <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'20px 24px 18px'}}>
@@ -407,7 +407,7 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
             </div>
 
             {p.notes&&(
-              <div style={{background:`linear-gradient(135deg,${T.brassGlow},rgba(184,147,90,.04))`,border:`1px solid ${T.border}`,borderLeft:`3px solid ${T.brass}`,borderRadius:'0 12px 12px 0',padding:'18px 20px'}}>
+              <div style={{background:`linear-gradient(135deg,${T.brassGlow},rgba(212,192,144,.04))`,border:`1px solid ${T.border}`,borderLeft:`3px solid ${T.brass}`,borderRadius:'0 12px 12px 0',padding:'18px 20px'}}>
                 <div style={{fontSize:11,fontFamily:"'Jost',sans-serif",fontWeight:600,letterSpacing:'.18em',textTransform:'uppercase',color:T.brass,marginBottom:8}}>Chef's Notes</div>
                 <p style={{fontStyle:'italic',fontSize:16,color:T.charcoal,lineHeight:1.7}}>{p.notes}</p>
               </div>
@@ -622,70 +622,113 @@ const ALLERGENS = [
   { id:'molluscs',  label:'Molluscs',    emoji:'🐚' },
 ]
 
-const allergenPromptText = (allergens) => {
-  if (!allergens || allergens.length === 0) return ''
-  const labels = allergens.map(id => ALLERGENS.find(a => a.id === id)?.label || id)
-  return `\n\nIMPORTANT: This recipe MUST completely avoid the following allergens: ${labels.join(', ')}. Do not include any ingredients containing these allergens, and do not suggest them as optional additions.`
+const allergenPromptText = (allergens, servings) => {
+  let text = ''
+  if (servings && servings !== 4) text += `\n\nThis recipe should serve ${servings} people.`
+  if (allergens && allergens.length > 0) {
+    const labels = allergens.map(id => ALLERGENS.find(a => a.id === id)?.label || id)
+    text += `\n\nIMPORTANT: This recipe MUST completely avoid the following allergens: ${labels.join(', ')}. Do not include any ingredients containing these allergens, and do not suggest them as optional additions.`
+  }
+  return text
 }
 
-const AllergenSettings = ({ allergens, onSave, onClose }) => {
-  const [selected, setSelected] = useState(allergens || [])
-  const toggle = (id) => setSelected(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id])
-  const save = () => { onSave(selected); onClose() }
+const PreferencesTab = ({ allergens, onSaveAllergens, defaultServings, onSaveServings }) => {
+  const [selectedAllergens, setSelectedAllergens] = useState(allergens || [])
+  const [servings, setServings] = useState(defaultServings || 4)
+  const [saved, setSaved] = useState(false)
+
+  const toggle = (id) => { setSaved(false); setSelectedAllergens(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]) }
+
+  const saveAll = () => {
+    onSaveAllergens(selectedAllergens)
+    onSaveServings(servings)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const SERVING_OPTIONS = [1, 2, 4, 6, 8, 10, 12]
 
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',zIndex:300,display:'flex',alignItems:'flex-end'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="scale-in" style={{background:T.white,borderRadius:'24px 24px 0 0',width:'100%',maxHeight:'88vh',overflow:'auto',paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {/* Handle */}
-        <div style={{display:'flex',justifyContent:'center',padding:'12px 0 4px'}}>
-          <div style={{width:40,height:4,borderRadius:2,background:T.borderLight}}/>
+    <div style={{height:'100%',overflow:'auto',background:T.white}}>
+      <div style={{background:T.charcoal,padding:'32px 24px 24px',borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+          <Icon name="settings" size={20} color={T.brass}/>
+          <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Preferences</h2>
         </div>
-        <div style={{padding:'12px 24px 28px'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <Icon name="shield" size={22} color={T.brass}/>
-              <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:26,fontWeight:400,color:T.charcoal}}>Allergen Filter</h2>
-            </div>
-            <button onClick={onClose} style={{background:'none',border:'none',color:T.muted,display:'flex',alignItems:'center',justifyContent:'center',width:32,height:32}}>
-              <Icon name="close" size={20} color={T.muted}/>
-            </button>
-          </div>
-          <p style={{fontSize:13,color:T.muted,marginBottom:20,lineHeight:1.5}}>Select allergens to avoid. All generated recipes will automatically exclude these ingredients.</p>
+        <p style={{fontSize:13,color:T.muted}}>Customize how recipes are generated for you</p>
+      </div>
 
-          {selected.length > 0 && (
-            <div style={{background:T.brassGlow,border:`1px solid ${T.border}`,borderRadius:10,padding:'10px 14px',marginBottom:20,display:'flex',alignItems:'center',gap:8}}>
+      <div style={{padding:24}}>
+
+        {/* Default Servings */}
+        <div style={{marginBottom:32}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+            <Icon name="users" size={16} color={T.brass}/>
+            <h3 style={{fontFamily:"'Cormorant Garamond'",fontSize:20,fontWeight:500,color:T.charcoal}}>Cooking For</h3>
+          </div>
+          <p style={{fontSize:13,color:T.muted,marginBottom:16}}>Recipes will default to this many servings.</p>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            {SERVING_OPTIONS.map(n => (
+              <button key={n} onClick={()=>{setServings(n);setSaved(false)}} style={{
+                width:52,height:52,borderRadius:12,border:`1.5px solid ${servings===n?T.brass:T.borderLight}`,
+                background:servings===n?T.brassGlow:T.offWhite,
+                fontFamily:"'Cormorant Garamond'",fontSize:20,fontWeight:servings===n?600:400,
+                color:servings===n?T.brassDark:T.charcoal,cursor:'pointer',transition:'all .2s',
+              }}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <p style={{fontSize:12,color:T.muted,marginTop:10}}>Currently: <b style={{color:T.charcoal}}>{servings} {servings===1?'person':'people'}</b></p>
+        </div>
+
+        <div style={{height:1,background:T.borderLight,marginBottom:28}}/>
+
+        {/* Allergens */}
+        <div style={{marginBottom:28}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+            <Icon name="shield" size={16} color={T.brass}/>
+            <h3 style={{fontFamily:"'Cormorant Garamond'",fontSize:20,fontWeight:500,color:T.charcoal}}>Allergen Filters</h3>
+          </div>
+          <p style={{fontSize:13,color:T.muted,marginBottom:16}}>All generated recipes will automatically avoid these ingredients.</p>
+
+          {selectedAllergens.length > 0 && (
+            <div style={{background:T.brassGlow,border:`1px solid ${T.border}`,borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',alignItems:'center',gap:8}}>
               <Icon name="shield" size={14} color={T.brass}/>
               <span style={{fontSize:13,color:T.brassDark,fontWeight:500}}>
-                {selected.length} allergen{selected.length>1?'s':''} selected — recipes will avoid {selected.map(id=>ALLERGENS.find(a=>a.id===id)?.label).join(', ')}
+                Avoiding: {selectedAllergens.map(id=>ALLERGENS.find(a=>a.id===id)?.label).join(', ')}
               </span>
             </div>
           )}
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:28}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
             {ALLERGENS.map(a => {
-              const on = selected.includes(a.id)
+              const on = selectedAllergens.includes(a.id)
               return (
                 <button key={a.id} onClick={()=>toggle(a.id)} style={{
                   display:'flex',alignItems:'center',gap:10,padding:'12px 14px',
-                  background: on ? T.brassGlow : T.offWhite,
-                  border: `1.5px solid ${on ? T.brass : T.borderLight}`,
+                  background:on?T.brassGlow:T.offWhite,
+                  border:`1.5px solid ${on?T.brass:T.borderLight}`,
                   borderRadius:12,textAlign:'left',transition:'all .2s',cursor:'pointer',
                 }}>
-                  <span style={{fontSize:20}}>{a.emoji}</span>
-                  <span style={{fontSize:14,fontWeight: on?500:400,color: on?T.brassDark:T.charcoal,flex:1}}>{a.label}</span>
-                  {on && <div style={{width:18,height:18,borderRadius:'50%',background:T.brass,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <Icon name="check" size={10} color={T.white}/>
+                  <span style={{fontSize:18}}>{a.emoji}</span>
+                  <span style={{fontSize:13,fontWeight:on?500:400,color:on?T.brassDark:T.charcoal,flex:1}}>{a.label}</span>
+                  {on&&<div style={{width:16,height:16,borderRadius:'50%',background:T.brass,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <Icon name="check" size={9} color={T.white}/>
                   </div>}
                 </button>
               )
             })}
           </div>
-
-          <div style={{display:'flex',gap:12}}>
-            <button className="btn-brass" onClick={save} style={{flex:1}}>Save Preferences</button>
-            {selected.length > 0 && <button className="btn-ghost" onClick={()=>{setSelected([]);onSave([]);onClose()}}>Clear All</button>}
-          </div>
+          {selectedAllergens.length>0&&(
+            <button onClick={()=>{setSelectedAllergens([]);setSaved(false)}} style={{marginTop:12,background:'none',border:'none',fontSize:13,color:T.muted,cursor:'pointer',textDecoration:'underline'}}>Clear all allergens</button>
+          )}
         </div>
+
+        <button className="btn-brass" onClick={saveAll} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+          {saved?<><Icon name="check" size={15} color={T.white}/> Saved!</>:'Save Preferences'}
+        </button>
+
       </div>
     </div>
   )
@@ -719,7 +762,7 @@ const getRandomSuggestions = () => {
   return shuffled.slice(0, 6)
 }
 
-const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[]}) => {
+const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4}) => {
   const [prompt,setPrompt]=useState('')
   const [loading,setLoading]=useState(false)
   const [generated,setGenerated]=useState(null)
@@ -731,7 +774,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[]}) => {
   const generate=async(text)=>{
     setLoading(true);setSaved(false);setGenerated(null);setError('');setShowChat(false)
     try {
-      const sys = RECIPE_SYS + allergenPromptText(allergens)
+      const sys = RECIPE_SYS + allergenPromptText(allergens, defaultServings)
       const raw=await callClaude([{role:'user',content:`Create a detailed recipe for: ${text}`}],sys)
       setGenerated({id:Date.now(),raw,photos:[],rating:0,createdAt:new Date().toISOString()})
     } catch(e){setError(e.message||'Could not generate recipe. Please try again.')}
@@ -756,7 +799,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[]}) => {
         </div>
         <p style={{fontSize:13,color:T.muted}}>Ask AI for any recipe you're craving</p>
         {allergens.length>0&&(
-          <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,background:'rgba(184,147,90,.15)',border:`1px solid ${T.border}`,borderRadius:20,padding:'5px 12px',width:'fit-content'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,background:'rgba(212,192,144,.15)',border:`1px solid ${T.border}`,borderRadius:20,padding:'5px 12px',width:'fit-content'}}>
             <Icon name="shield" size={13} color={T.brass}/>
             <span style={{fontSize:11,color:T.brassLight}}>Avoiding: {allergens.map(id=>ALLERGENS.find(a=>a.id===id)?.label).join(', ')}</span>
           </div>
@@ -831,7 +874,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[]}) => {
 
               <div style={{display:'flex',gap:10,marginTop:10}}>
                 <button className="btn-brass" onClick={saveCol} disabled={saved} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                  {saved?<><Icon name="check" size={15} color={T.white}/> Saved!</>:<><Icon name="plus" size={15} color={T.white}/> Save to Favorites</>}
+                  {saved?<><Icon name="heartFill" size={15} color={T.white}/> Saved to Favorites!</>:<><Icon name="heart" size={15} color={T.white}/> Save to Favorites</>}
                 </button>
               </div>
               {!saved&&<p style={{fontSize:11,color:T.muted,textAlign:'center',marginTop:8}}>Tap the title above to read the full recipe</p>}
@@ -1037,7 +1080,7 @@ Serves: N
 ## Notes
 [optional tip]`
 
-const PantryTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[]}) => {
+const PantryTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[], defaultServings=4}) => {
   const [photos,setPhotos]=useState([])
   const [loading,setLoading]=useState(false)
   const [generated,setGenerated]=useState(null)
@@ -1053,7 +1096,7 @@ const PantryTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[]}) => {
   const genPhotos=async()=>{
     if(!photos.length)return; setLoading(true);setSaved(false);setGenerated(null);setError('');setShowChat(false)
     try {
-      const sys = PANTRY_SYS + allergenPromptText(allergens)
+      const sys = PANTRY_SYS + allergenPromptText(allergens, defaultServings)
       const b64s=await Promise.all(photos.map(p=>toBase64(p.file)))
       const content=[...b64s.map(b64=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}})),{type:'text',text:'Look at these photos of my pantry/fridge. List what you see, then create one delicious recipe. Format as a proper cookbook recipe.'}]
       const raw=await callClaude([{role:'user',content}],sys)
@@ -1065,7 +1108,7 @@ const PantryTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[]}) => {
   const genText=async()=>{
     if(!ingredients.trim())return; setLoading(true);setSaved(false);setGenerated(null);setError('');setShowChat(false)
     try {
-      const sys = PANTRY_SYS + allergenPromptText(allergens)
+      const sys = PANTRY_SYS + allergenPromptText(allergens, defaultServings)
       const raw=await callClaude([{role:'user',content:`I have: ${ingredients}. Create a recipe.`}],sys)
       setGenerated({id:Date.now(),raw,photos:[],rating:0,createdAt:new Date().toISOString()})
     } catch(e){setError(e.message||'Could not generate recipe.')}
@@ -1170,10 +1213,9 @@ const PantryTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[]}) => {
 export default function App() {
   const {user,loading:authLoading,signIn,signUp,signOut,resetPassword}=useAuth()
   const {recipes,favorites,menus,loading:recipesLoading,addRecipe,updateRecipe,toggleFavorite,deleteRecipe,createMenu,deleteMenu}=useRecipes(user)
-  const {allergens,saveAllergens}=usePreferences(user)
+  const {allergens,saveAllergens,defaultServings,saveDefaultServings}=usePreferences(user)
   const [activeTab,setActiveTab]=useState('discover')
   const [viewingRecipe,setViewingRecipe]=useState(null)
-  const [showAllergens,setShowAllergens]=useState(false)
 
   const handleUpdate=useCallback(async(updated)=>{ const s=await updateRecipe(updated); if(s&&viewingRecipe?.id===s.id)setViewingRecipe(s) },[updateRecipe,viewingRecipe])
   const handleFavorite=useCallback(async(recipe)=>{ await toggleFavorite(recipe) },[toggleFavorite])
@@ -1191,14 +1233,16 @@ export default function App() {
     {id:'discover',icon:'sparkle',label:'Discover'},
     {id:'favorites',icon:'heart',label:'Favorites'},
     {id:'pantry',icon:'fridge',label:'Pantry'},
+    {id:'prefs',icon:'settings',label:'Prefs'},
   ]
 
   return shell(<>
     <div style={{height:3,background:`linear-gradient(90deg,${T.brass},${T.brassDark},${T.brass})`,flexShrink:0}}/>
     <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-      {activeTab==='discover'&&<DiscoverTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} allergens={allergens}/>}
+      {activeTab==='discover'&&<DiscoverTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} allergens={allergens} defaultServings={defaultServings}/>}
       {activeTab==='favorites'&&<FavoritesTab favorites={favorites} recipes={recipes} menus={menus} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} onCreateMenu={createMenu} onDeleteMenu={deleteMenu} onUpdate={handleUpdate}/>}
-      {activeTab==='pantry'&&<PantryTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} allergens={allergens}/>}
+      {activeTab==='pantry'&&<PantryTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} allergens={allergens} defaultServings={defaultServings}/>}
+      {activeTab==='prefs'&&<PreferencesTab allergens={allergens} onSaveAllergens={saveAllergens} defaultServings={defaultServings} onSaveServings={saveDefaultServings}/>}
     </div>
     <div style={{background:T.charcoal,borderTop:`1px solid ${T.border}`,display:'flex',flexShrink:0,paddingBottom:'env(safe-area-inset-bottom)',width:'100%'}}>
       {tabs.map(tab=>{
@@ -1213,17 +1257,11 @@ export default function App() {
           </button>
         )
       })}
-      {/* Allergen settings button */}
-      <button onClick={()=>setShowAllergens(true)} style={{flex:1,padding:'12px 4px 10px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:4,color:allergens.length>0?T.brass:T.muted,cursor:'pointer'}}>
-        <Icon name="shield" size={20} color={allergens.length>0?T.brass:T.muted}/>
-        <span style={{fontSize:10,fontWeight:500,letterSpacing:'.05em',textTransform:'uppercase'}}>Diet</span>
-      </button>
       <button onClick={signOut} style={{flex:1,padding:'12px 4px 10px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:4,color:T.muted,cursor:'pointer'}}>
         <Icon name="logout" size={20} color={T.muted}/>
         <span style={{fontSize:10,fontWeight:500,letterSpacing:'.05em',textTransform:'uppercase'}}>Out</span>
       </button>
     </div>
     {viewingRecipe&&<RecipeDetail recipe={viewingRecipe} onClose={()=>setViewingRecipe(null)} onFavorite={handleFavorite} isFavorited={favorites.some(f=>f.id===viewingRecipe.id)} onUpdate={handleUpdate}/>}
-    {showAllergens&&<AllergenSettings allergens={allergens} onSave={saveAllergens} onClose={()=>setShowAllergens(false)}/>}
   </>)
 }
