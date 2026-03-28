@@ -30,6 +30,8 @@ gs.textContent = `
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
   @keyframes scaleIn { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
   @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes heartPop { 0%{transform:scale(1)} 40%{transform:scale(1.5)} 70%{transform:scale(.88)} 100%{transform:scale(1)} }
+  .heart-pop { animation: heartPop .4s cubic-bezier(.22,.68,0,1.4) both; }
   .fade-up { animation: fadeUp .45s cubic-bezier(.22,.68,0,1.2) both; }
   .scale-in { animation: scaleIn .35s cubic-bezier(.22,.68,0,1.2) both; }
   .btn-brass {
@@ -500,6 +502,8 @@ const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
   const [editingNote,setEditingNote]=useState(false)
   const [showChat,setShowChat]=useState(false)
   const [currentRaw,setCurrentRaw]=useState(recipe.raw)
+  const [localFavorited,setLocalFavorited]=useState(isFavorited)
+  const [heartBounce,setHeartBounce]=useState(false)
   const fileRef=useRef()
   const p=parseRecipe(currentRaw)
   const addPhoto=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const u=[...photos,ev.target.result];setPhotos(u);onUpdate?.({...recipe,photos:u})};r.readAsDataURL(f)}
@@ -507,6 +511,13 @@ const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
   const saveRating=(r)=>{setRating(r);onUpdate?.({...recipe,rating:r})}
   const saveNote=()=>{setEditingNote(false);onUpdate?.({...recipe,notes:note})}
   const handleRecipeUpdate=(newRaw)=>{ setCurrentRaw(newRaw); onUpdate?.({...recipe,raw:newRaw}) }
+  const handleFavoriteClick=()=>{
+    const next=!localFavorited
+    setLocalFavorited(next)
+    setHeartBounce(true)
+    setTimeout(()=>setHeartBounce(false),400)
+    onFavorite(recipe)
+  }
   return (
     <div style={{position:'fixed',inset:0,background:T.black,zIndex:100,overflow:'hidden',display:'flex',flexDirection:'column'}}>
       {showChat&&<RecipeChatPanel recipe={{...recipe,raw:currentRaw}} onRecipeUpdate={handleRecipeUpdate} onClose={()=>setShowChat(false)}/>}
@@ -515,7 +526,11 @@ const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
           <div style={{height:260,background:`linear-gradient(135deg,${T.charcoal},${T.black})`,display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{opacity:.15}}><Icon name="chef" size={80} color={T.brass}/></div></div>}
         <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.2) 60%,transparent 100%)'}}/>
         <button onClick={onClose} style={{position:'absolute',top:20,left:20,width:42,height:42,background:'rgba(0,0,0,.5)',border:`1px solid ${T.border}`,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="back" size={18} color={T.white}/></button>
-        <button onClick={()=>onFavorite(recipe)} style={{position:'absolute',top:20,right:20,width:42,height:42,background:isFavorited?T.brass:'rgba(0,0,0,.5)',border:`1px solid ${isFavorited?T.brass:T.border}`,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',transition:'all .3s'}}><Icon name={isFavorited?'heartFill':'heart'} size={18} color={T.white}/></button>
+        <button onClick={handleFavoriteClick} style={{position:'absolute',top:20,right:20,width:42,height:42,background:localFavorited?T.brass:'rgba(0,0,0,.5)',border:`1px solid ${localFavorited?T.brass:T.border}`,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .3s, border .3s'}}>
+          <div className={heartBounce?'heart-pop':''} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <Icon name={localFavorited?'heartFill':'heart'} size={18} color={T.white}/>
+          </div>
+        </button>
         <div style={{position:'absolute',bottom:20,left:24,right:24}}>
           <h1 style={{fontFamily:"'Cormorant Garamond'",fontSize:32,fontWeight:400,color:T.white,lineHeight:1.15,marginBottom:8}}>{p.title}</h1>
           <div style={{display:'flex',gap:20,alignItems:'center',flexWrap:'wrap'}}>
@@ -977,7 +992,9 @@ const FavoritesTab = ({favorites, recipes, menus, onOpenRecipe, onFavorite, onCr
   const [selected,setSelected]=useState([])
   const [viewingMenu,setViewingMenu]=useState(null)
   const [viewingRecipe,setViewingRecipe]=useState(null)
+  const [search,setSearch]=useState('')
 
+  const filtered = favorites.filter(r=>parseRecipe(r.raw).title.toLowerCase().includes(search.toLowerCase()))
   const createMenu=async()=>{ if(!menuName.trim())return; await onCreateMenu(menuName,selected); setShowModal(false);setMenuName('');setSelected([]) }
 
   if (viewingRecipe) {
@@ -1004,7 +1021,15 @@ const FavoritesTab = ({favorites, recipes, menus, onOpenRecipe, onFavorite, onCr
     <div style={{height:'100%',overflow:'auto',background:T.white}}>
       <div style={{background:T.charcoal,padding:'32px 24px 0'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}><Icon name="heartFill" size={20} color={T.brass}/><h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Favorites</h2></div>
-        <p style={{fontSize:13,color:T.muted,marginBottom:16}}>Your curated favorites — polished view, menus & notes</p>
+        <p style={{fontSize:13,color:T.muted,marginBottom:14}}>Your curated favorites — polished view, menus & notes</p>
+        {view==='favorites'&&favorites.length>0&&(
+          <div style={{position:'relative',marginBottom:14}}>
+            <input className="input-field" placeholder="Search favorites…" value={search} onChange={e=>setSearch(e.target.value)}
+              style={{paddingLeft:44,background:'rgba(255,255,255,.07)',border:`1px solid ${T.border}`,color:T.white}}/>
+            <div style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)'}}><Icon name="search" size={16} color={T.muted}/></div>
+            {search&&<button onClick={()=>setSearch('')} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:T.muted,cursor:'pointer',fontSize:16,lineHeight:1}}>×</button>}
+          </div>
+        )}
         <div style={{display:'flex',borderTop:`1px solid ${T.border}`}}>
           {['favorites','menus'].map(t=>(
             <button key={t} onClick={()=>setView(t)} style={{flex:1,padding:'14px 8px',background:'none',border:'none',borderBottom:view===t?`2px solid ${T.brass}`:'2px solid transparent',color:view===t?T.brass:T.muted,fontSize:12,fontWeight:500,letterSpacing:'.1em',textTransform:'uppercase',transition:'all .2s'}}>{t}</button>
@@ -1015,8 +1040,10 @@ const FavoritesTab = ({favorites, recipes, menus, onOpenRecipe, onFavorite, onCr
       <div style={{padding:24}}>
         {view==='favorites'&&(
           favorites.length===0
-            ?<div style={{textAlign:'center',padding:'48px 24px',color:T.muted}}><Icon name="heart" size={56} color={T.border}/><p style={{marginTop:16,fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:22,color:T.charcoal}}>No favorites yet</p><p style={{fontSize:14,marginTop:8,lineHeight:1.6,maxWidth:260,margin:'8px auto 0'}}>Go to <b>Collection</b>, open any recipe, and tap the <b>♥</b> to add it here for a polished cookbook view.</p></div>
-            :favorites.map(r=><PolishedRecipeCard key={r.id} recipe={r} onClick={()=>setViewingRecipe(r)} onUnfavorite={onFavorite}/>)
+            ?<div style={{textAlign:'center',padding:'48px 24px',color:T.muted}}><Icon name="heart" size={56} color={T.border}/><p style={{marginTop:16,fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:22,color:T.charcoal}}>No favorites yet</p><p style={{fontSize:14,marginTop:8,lineHeight:1.6,maxWidth:260,margin:'8px auto 0'}}>Open any recipe and tap the ♥ to save it here.</p></div>
+            :filtered.length===0
+              ?<div style={{textAlign:'center',padding:'48px 24px',color:T.muted}}><Icon name="search" size={40} color={T.border}/><p style={{marginTop:12,fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:20,color:T.charcoal}}>No results for "{search}"</p></div>
+              :filtered.map(r=><PolishedRecipeCard key={r.id} recipe={r} onClick={()=>setViewingRecipe(r)} onUnfavorite={onFavorite}/>)
         )}
 
         {view==='menus'&&(

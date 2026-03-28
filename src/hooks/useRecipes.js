@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
+function extractTitle(raw = '') {
+  const match = raw.match(/^#\s+(.+)$/m)
+  return match ? match[1].trim() : 'Untitled Recipe'
+}
+
 export function useRecipes(user) {
   const [recipes, setRecipes] = useState([])
   const [menus, setMenus] = useState([])
@@ -81,7 +86,6 @@ export function useRecipes(user) {
     }
   }, [user])
 
-  // Toggle favorite
   // Toggle favorite — prevents duplicates by checking local recipes list first
   const toggleFavorite = useCallback(async (recipe) => {
     if (!user) return
@@ -162,9 +166,4 @@ export function useRecipes(user) {
     createMenu, deleteMenu,
     reload: loadRecipes,
   }
-}
-
-function extractTitle(raw = '') {
-  const match = raw.match(/^#\s+(.+)$/m)
-  return match ? match[1].trim() : 'Untitled Recipe'
 }
