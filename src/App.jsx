@@ -646,7 +646,7 @@ const PreferencesTab = ({ allergens, onSaveAllergens, defaultServings, onSaveSer
     setTimeout(() => setSaved(false), 2000)
   }
 
-  const SERVING_OPTIONS = [1, 2, 4, 6, 8, 10, 12]
+  const SERVING_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
   return (
     <div style={{height:'100%',overflow:'auto',background:T.white}}>
@@ -1233,7 +1233,7 @@ export default function App() {
     {id:'discover',icon:'sparkle',label:'Discover'},
     {id:'favorites',icon:'heart',label:'Favorites'},
     {id:'pantry',icon:'fridge',label:'Pantry'},
-    {id:'prefs',icon:'settings',label:'Prefs'},
+    {id:'prefs',icon:'settings',label:'Preferences'},
   ]
 
   return shell(<>
