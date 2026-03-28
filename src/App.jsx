@@ -361,6 +361,7 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
   const [rating, setRating] = useState(recipe.rating||0)
   const [note, setNote] = useState(recipe.notes||'')
   const [editingNote, setEditingNote] = useState(false)
+  const [showCookMode, setShowCookMode] = useState(false)
   const fileRef = useRef()
   const p = parseRecipe(recipe.raw)
 
@@ -371,6 +372,7 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
 
   return (
     <div style={{position:'fixed',inset:0,background:T.white,zIndex:100,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      {showCookMode&&<CookMode recipe={recipe} onClose={()=>setShowCookMode(false)}/>}
       <div style={{position:'relative',flexShrink:0,minHeight:280,overflow:'hidden'}}>
         {photos[0] ? <img src={photos[0]} alt="" style={{width:'100%',height:280,objectFit:'cover'}}/> :
           <div style={{height:280,background:`linear-gradient(160deg,${T.charcoal} 0%,#1a1a18 60%,${T.brassDark}44 100%)`,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -448,6 +450,11 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
                 <p style={{fontStyle:'italic',fontSize:16,color:T.charcoal,lineHeight:1.7}}>{p.notes}</p>
               </div>
             )}
+
+            <button onClick={()=>setShowCookMode(true)} className="btn-brass" style={{width:'100%',marginTop:28,marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              <Icon name="chef" size={16} color={T.white}/>
+              Start Cook Mode
+            </button>
           </div>
         )}
 
@@ -528,6 +535,97 @@ const RecipeCard = ({recipe, onClick, onFavorite, isFavorited}) => {
 }
 
 // ── Standard Recipe Detail (Collection) ───────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// COOK MODE
+// ══════════════════════════════════════════════════════════════════════════
+const CookMode = ({recipe, onClose}) => {
+  const p = parseRecipe(recipe.raw)
+  const [step, setStep] = useState(0)
+  const [phase, setPhase] = useState('ingredients') // ingredients | steps
+  const totalSteps = p.steps.length
+
+  // Keep screen awake using WakeLock API
+  useEffect(() => {
+    let lock = null
+    const requestWake = async () => {
+      try { if ('wakeLock' in navigator) lock = await navigator.wakeLock.request('screen') } catch(e) {}
+    }
+    requestWake()
+    return () => { if (lock) lock.release() }
+  }, [])
+
+  const goNext = () => {
+    if (phase === 'ingredients') { setPhase('steps'); setStep(0) }
+    else if (step < totalSteps - 1) setStep(s => s + 1)
+    else onClose()
+  }
+  const goPrev = () => {
+    if (phase === 'steps' && step === 0) setPhase('ingredients')
+    else if (step > 0) setStep(s => s - 1)
+  }
+
+  const progress = phase === 'ingredients' ? 0 : ((step + 1) / totalSteps) * 100
+
+  return (
+    <div style={{position:'fixed',inset:0,background:T.black,zIndex:300,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      {/* Top bar */}
+      <div style={{padding:'20px 24px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <button onClick={onClose} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'8px 16px',color:T.muted,fontSize:13,cursor:'pointer'}}>Exit</button>
+        <div style={{fontFamily:"'Cormorant Garamond'",fontSize:16,color:T.muted,fontStyle:'italic',textAlign:'center',flex:1,margin:'0 16px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div>
+        {phase==='steps'
+          ? <span style={{fontSize:13,color:T.muted,flexShrink:0}}>{step+1} / {totalSteps}</span>
+          : <span style={{fontSize:13,color:T.muted,flexShrink:0}}>Ingredients</span>
+        }
+      </div>
+
+      {/* Progress bar */}
+      <div style={{height:2,background:'rgba(168,160,144,0.12)',flexShrink:0,margin:'0 24px'}}>
+        <div style={{height:'100%',background:T.brass,borderRadius:2,transition:'width .4s ease',width:`${progress}%`}}/>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 28px',overflow:'hidden'}}>
+        {phase==='ingredients' ? (
+          <div style={{width:'100%',maxWidth:500}}>
+            <div style={{fontSize:11,fontWeight:600,letterSpacing:'.2em',textTransform:'uppercase',color:T.brass,textAlign:'center',marginBottom:28}}>Ingredients</div>
+            <div style={{display:'flex',flexDirection:'column',gap:0}}>
+              {p.ingredients.map((ing,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'baseline',gap:16,padding:'14px 0',borderBottom:`1px solid rgba(168,160,144,0.1)`}}>
+                  <div style={{width:6,height:6,borderRadius:'50%',background:T.brass,flexShrink:0,marginTop:8}}/>
+                  <span style={{fontFamily:"'Cormorant Garamond'",fontSize:22,color:T.white,lineHeight:1.4,fontStyle:'italic'}}>{prettifyIngredient(ing)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div style={{width:'100%',maxWidth:500,textAlign:'center'}}>
+            <div style={{width:64,height:64,borderRadius:'50%',background:`linear-gradient(135deg,${T.brass},${T.brassDark})`,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 28px',flexShrink:0}}>
+              <span style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:500,color:T.white}}>{step+1}</span>
+            </div>
+            <p style={{fontFamily:"'Cormorant Garamond'",fontSize:clamp(20,28),color:T.white,lineHeight:1.6,fontWeight:300}}>{p.steps[step]}</p>
+            {step===totalSteps-1&&(
+              <div style={{marginTop:32,fontSize:14,color:T.brass,fontFamily:"'Cormorant Garamond'",fontStyle:'italic'}}>Last step — almost done! 🎉</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <div style={{padding:'20px 24px 40px',display:'flex',gap:16,flexShrink:0}}>
+        <button onClick={goPrev} disabled={phase==='ingredients'} style={{flex:1,padding:'18px',background:'none',border:`1px solid ${T.border}`,borderRadius:14,color:phase==='ingredients'?'rgba(168,160,144,0.2)':T.muted,fontSize:15,cursor:phase==='ingredients'?'default':'pointer',transition:'all .2s'}}>
+          ← Back
+        </button>
+        <button onClick={goNext} style={{flex:2,padding:'18px',background:`linear-gradient(135deg,${T.brass},${T.brassDark})`,border:'none',borderRadius:14,color:T.white,fontSize:15,fontWeight:500,letterSpacing:'.06em',cursor:'pointer',transition:'all .2s'}}>
+          {phase==='ingredients' ? 'Start Cooking →' : step===totalSteps-1 ? '✓ Done!' : 'Next Step →'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// tiny helper used in CookMode
+const clamp = (min, max) => `clamp(${min}px, 4vw, ${max}px)`
+
 const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
   const [tab,setTab]=useState('recipe')
   const [photos,setPhotos]=useState(recipe.photos||[])
@@ -535,6 +633,7 @@ const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
   const [note,setNote]=useState(recipe.notes||'')
   const [editingNote,setEditingNote]=useState(false)
   const [showChat,setShowChat]=useState(false)
+  const [showCookMode,setShowCookMode]=useState(false)
   const [currentRaw,setCurrentRaw]=useState(recipe.raw)
   const [localFavorited,setLocalFavorited]=useState(isFavorited)
   const [heartBounce,setHeartBounce]=useState(false)
@@ -554,6 +653,7 @@ const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
   }
   return (
     <div style={{position:'fixed',inset:0,background:T.black,zIndex:100,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      {showCookMode&&<CookMode recipe={{...recipe,raw:currentRaw}} onClose={()=>setShowCookMode(false)}/>}
       {showChat&&<RecipeChatPanel recipe={{...recipe,raw:currentRaw}} onRecipeUpdate={handleRecipeUpdate} onClose={()=>setShowChat(false)}/>}
       <div style={{position:'relative',minHeight:260,flexShrink:0,overflow:'hidden'}}>
         {photos[0]?<img src={photos[0]} alt="" style={{width:'100%',height:260,objectFit:'cover'}}/>:
@@ -603,6 +703,12 @@ const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
               </div>
             ))}</div>
             {p.notes&&<><BrassDivider label="Chef's Notes"/><p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:16,color:T.muted,lineHeight:1.7,paddingBottom:24}}>{p.notes}</p></>}
+
+            {/* Cook Mode button */}
+            <button onClick={()=>setShowCookMode(true)} className="btn-brass" style={{width:'100%',marginTop:8,marginBottom:10,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              <Icon name="chef" size={16} color={T.white}/>
+              Start Cook Mode
+            </button>
 
             {/* AI Chat button */}
             <button onClick={()=>setShowChat(true)} style={{width:'100%',marginTop:8,marginBottom:32,padding:'14px',background:T.offWhite,border:`1.5px solid ${T.border}`,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontSize:13,fontWeight:500,color:T.charcoal,letterSpacing:'.04em',transition:'all .2s'}}
