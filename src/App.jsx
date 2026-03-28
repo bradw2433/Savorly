@@ -11,10 +11,10 @@ fontLink.href = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ita
 document.head.appendChild(fontLink)
 
 const T = {
-  white: '#FAF8F0', offWhite: '#F0EBE0', black: '#100E0C', charcoal: '#2E2820',
-  brass: '#D4C090', brassLight: '#E4D4A8', brassDark: '#7A6050',
-  brassGlow: 'rgba(212,192,144,0.15)', border: 'rgba(212,192,144,0.28)',
-  borderLight: 'rgba(212,192,144,0.13)', muted: '#8A7E70',
+  white: '#FDFCF8', offWhite: '#F0EDE8', black: '#080808', charcoal: '#141414',
+  brass: '#A8A090', brassLight: '#C8C4B8', brassDark: '#706858',
+  brassGlow: 'rgba(168,160,144,0.15)', border: 'rgba(168,160,144,0.28)',
+  borderLight: 'rgba(168,160,144,0.13)', muted: '#888070',
 }
 
 const gs = document.createElement('style')
@@ -40,7 +40,7 @@ gs.textContent = `
     padding: 14px 28px; font-size: 13px; font-weight: 500;
     letter-spacing: .08em; text-transform: uppercase; transition: all .25s;
   }
-  .btn-brass:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(212,192,144,.4); }
+  .btn-brass:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(168,160,144,.4); }
   .btn-brass:active { transform: translateY(0); }
   .btn-brass:disabled { opacity:.5; transform:none; box-shadow:none; cursor:default; }
   .btn-ghost {
@@ -346,7 +346,7 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
         <button onClick={onClose} style={{position:'absolute',top:20,left:20,width:42,height:42,background:'rgba(0,0,0,.55)',backdropFilter:'blur(8px)',border:`1px solid ${T.border}`,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center'}}>
           <Icon name="back" size={18} color={T.white}/>
         </button>
-        <button onClick={()=>onUnfavorite(recipe)} style={{position:'absolute',top:20,right:20,width:42,height:42,background:T.brass,border:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(212,192,144,.5)'}}>
+        <button onClick={()=>onUnfavorite(recipe)} style={{position:'absolute',top:20,right:20,width:42,height:42,background:T.brass,border:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(168,160,144,.5)'}}>
           <Icon name="heartFill" size={18} color={T.white}/>
         </button>
         <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'20px 24px 18px'}}>
@@ -409,7 +409,7 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
             </div>
 
             {p.notes&&(
-              <div style={{background:`linear-gradient(135deg,${T.brassGlow},rgba(212,192,144,.04))`,border:`1px solid ${T.border}`,borderLeft:`3px solid ${T.brass}`,borderRadius:'0 12px 12px 0',padding:'18px 20px'}}>
+              <div style={{background:`linear-gradient(135deg,${T.brassGlow},rgba(168,160,144,.04))`,border:`1px solid ${T.border}`,borderLeft:`3px solid ${T.brass}`,borderRadius:'0 12px 12px 0',padding:'18px 20px'}}>
                 <div style={{fontSize:11,fontFamily:"'Jost',sans-serif",fontWeight:600,letterSpacing:'.18em',textTransform:'uppercase',color:T.brass,marginBottom:8}}>Chef's Notes</div>
                 <p style={{fontStyle:'italic',fontSize:16,color:T.charcoal,lineHeight:1.7}}>{p.notes}</p>
               </div>
@@ -814,7 +814,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4
         </div>
         <p style={{fontSize:13,color:T.muted}}>Ask AI for any recipe you're craving</p>
         {allergens.length>0&&(
-          <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,background:'rgba(212,192,144,.15)',border:`1px solid ${T.border}`,borderRadius:20,padding:'5px 12px',width:'fit-content'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,background:'rgba(168,160,144,.15)',border:`1px solid ${T.border}`,borderRadius:20,padding:'5px 12px',width:'fit-content'}}>
             <Icon name="shield" size={13} color={T.brass}/>
             <span style={{fontSize:11,color:T.brassLight}}>Avoiding: {allergens.map(id=>ALLERGENS.find(a=>a.id===id)?.label).join(', ')}</span>
           </div>
