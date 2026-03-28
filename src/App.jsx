@@ -783,6 +783,187 @@ const PreferencesTab = ({ allergens, onSaveAllergens, defaultServings, onSaveSer
   )
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// CREATE YOUR OWN RECIPE
+// ══════════════════════════════════════════════════════════════════════════
+const CreateRecipeForm = ({onSave, onClose}) => {
+  const [title,setTitle]=useState('')
+  const [description,setDescription]=useState('')
+  const [prepTime,setPrepTime]=useState('')
+  const [cookTime,setCookTime]=useState('')
+  const [servings,setServings]=useState('4')
+  const [ingredients,setIngredients]=useState(['','','',''])
+  const [steps,setSteps]=useState(['','',''])
+  const [notes,setNotes]=useState('')
+  const [polishing,setPolishing]=useState(false)
+  const [saving,setSaving]=useState(false)
+
+  const addIngredient=()=>setIngredients(prev=>[...prev,''])
+  const updateIngredient=(i,v)=>setIngredients(prev=>prev.map((x,idx)=>idx===i?v:x))
+  const removeIngredient=(i)=>setIngredients(prev=>prev.filter((_,idx)=>idx!==i))
+
+  const addStep=()=>setSteps(prev=>[...prev,''])
+  const updateStep=(i,v)=>setSteps(prev=>prev.map((x,idx)=>idx===i?v:x))
+  const removeStep=(i)=>setSteps(prev=>prev.filter((_,idx)=>idx!==i))
+
+  const buildRaw=()=>{
+    const ings=ingredients.filter(i=>i.trim())
+    const stps=steps.filter(s=>s.trim())
+    return [
+      `# ${title}`,
+      description,
+      prepTime?`Prep Time: ${prepTime}`:'',
+      cookTime?`Cook Time: ${cookTime}`:'',
+      servings?`Serves: ${servings}`:'',
+      '',
+      '## Ingredients',
+      ...ings.map(i=>`- ${i}`),
+      '',
+      '## Instructions',
+      ...stps.map((s,i)=>`${i+1}. ${s}`),
+      notes?`\n## Notes\n${notes}`:'',
+    ].filter(l=>l!==undefined).join('\n').trim()
+  }
+
+  const polishWithAI=async()=>{
+    if (!title.trim()) return
+    setPolishing(true)
+    try {
+      const raw=buildRaw()
+      const sys=`You are a professional recipe editor. The user has typed a recipe and wants it polished. Clean up the formatting, fill in any missing details, improve ingredient precision, and make the steps clear and thorough. Return ONLY the polished recipe in this format:
+# [Title]
+[Description]
+Prep Time: X minutes
+Cook Time: X minutes
+Serves: N
+## Ingredients
+- [amount] [ingredient]
+## Instructions
+1. [step]
+## Notes
+[tip]`
+      const polished=await callClaude([{role:'user',content:`Please polish this recipe:\n\n${raw}`}],sys)
+      const p=parseRecipe(polished)
+      setTitle(p.title||title)
+      setDescription(p.description||description)
+      setPrepTime(p.prepTime||prepTime)
+      setCookTime(p.cookTime||cookTime)
+      setServings(p.servings||servings)
+      setIngredients(p.ingredients.length>0?p.ingredients:ingredients)
+      setSteps(p.steps.length>0?p.steps:steps)
+      setNotes(p.notes||notes)
+    } catch(e){ console.error(e) }
+    setPolishing(false)
+  }
+
+  const handleSave=async()=>{
+    if (!title.trim()||ingredients.filter(i=>i.trim()).length===0) return
+    setSaving(true)
+    const raw=buildRaw()
+    await onSave({id:Date.now(),raw,photos:[],rating:0,createdAt:new Date().toISOString(),is_favorite:false})
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div style={{position:'fixed',inset:0,background:T.white,zIndex:200,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      {/* Header */}
+      <div style={{background:T.charcoal,padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onClose} style={{background:'none',border:'none',color:T.muted,cursor:'pointer',display:'flex',alignItems:'center'}}>
+            <Icon name="back" size={20} color={T.white}/>
+          </button>
+          <div>
+            <div style={{fontFamily:"'Cormorant Garamond'",fontSize:22,fontWeight:400,color:T.white}}>Create Your Recipe</div>
+            <div style={{fontSize:11,color:T.muted}}>Add a recipe you already know</div>
+          </div>
+        </div>
+        <button onClick={polishWithAI} disabled={!title.trim()||polishing} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'7px 14px',color:T.brass,fontSize:12,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:6,opacity:!title.trim()?0.4:1}}>
+          {polishing?<><LoadingDots/></>:<><Icon name="sparkle" size={13} color={T.brass}/>Polish with AI</>}
+        </button>
+      </div>
+
+      {/* Form */}
+      <div style={{flex:1,overflow:'auto',padding:'24px'}}>
+
+        {/* Title */}
+        <div style={{marginBottom:20}}>
+          <label style={{fontSize:11,fontWeight:600,letterSpacing:'.12em',textTransform:'uppercase',color:T.brass,display:'block',marginBottom:8}}>Recipe Name *</label>
+          <input className="input-field" placeholder="e.g. Mom's Chicken Soup" value={title} onChange={e=>setTitle(e.target.value)} style={{fontSize:16}}/>
+        </div>
+
+        {/* Description */}
+        <div style={{marginBottom:20}}>
+          <label style={{fontSize:11,fontWeight:600,letterSpacing:'.12em',textTransform:'uppercase',color:T.brass,display:'block',marginBottom:8}}>Description</label>
+          <input className="input-field" placeholder="A short description…" value={description} onChange={e=>setDescription(e.target.value)}/>
+        </div>
+
+        {/* Time & Servings */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:20}}>
+          {[['Prep Time','e.g. 15 minutes',prepTime,setPrepTime],['Cook Time','e.g. 30 minutes',cookTime,setCookTime],['Serves','e.g. 4',servings,setServings]].map(([label,ph,val,setter])=>(
+            <div key={label}>
+              <label style={{fontSize:10,fontWeight:600,letterSpacing:'.1em',textTransform:'uppercase',color:T.brass,display:'block',marginBottom:6}}>{label}</label>
+              <input className="input-field" placeholder={ph} value={val} onChange={e=>setter(e.target.value)} style={{fontSize:13,padding:'10px 12px'}}/>
+            </div>
+          ))}
+        </div>
+
+        {/* Ingredients */}
+        <div style={{marginBottom:24}}>
+          <label style={{fontSize:11,fontWeight:600,letterSpacing:'.12em',textTransform:'uppercase',color:T.brass,display:'block',marginBottom:8}}>Ingredients *</label>
+          {ingredients.map((ing,i)=>(
+            <div key={i} style={{display:'flex',gap:8,marginBottom:8,alignItems:'center'}}>
+              <input className="input-field" placeholder={`e.g. 2 cups flour`} value={ing} onChange={e=>updateIngredient(i,e.target.value)}
+                style={{flex:1,padding:'10px 14px',fontSize:14}}/>
+              {ingredients.length>1&&(
+                <button onClick={()=>removeIngredient(i)} style={{background:'none',border:'none',color:T.muted,cursor:'pointer',fontSize:18,padding:'0 4px',flexShrink:0}}>×</button>
+              )}
+            </div>
+          ))}
+          <button onClick={addIngredient} style={{background:'none',border:`1px dashed ${T.border}`,borderRadius:8,padding:'8px 16px',fontSize:13,color:T.brass,cursor:'pointer',width:'100%',marginTop:4}}>
+            + Add Ingredient
+          </button>
+        </div>
+
+        {/* Steps */}
+        <div style={{marginBottom:24}}>
+          <label style={{fontSize:11,fontWeight:600,letterSpacing:'.12em',textTransform:'uppercase',color:T.brass,display:'block',marginBottom:8}}>Instructions</label>
+          {steps.map((step,i)=>(
+            <div key={i} style={{display:'flex',gap:10,marginBottom:10,alignItems:'flex-start'}}>
+              <div style={{width:28,height:28,borderRadius:'50%',background:`linear-gradient(135deg,${T.brass},${T.brassDark})`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:8}}>
+                <span style={{fontFamily:"'Cormorant Garamond'",fontSize:15,fontWeight:500,color:T.white}}>{i+1}</span>
+              </div>
+              <div style={{flex:1}}>
+                <textarea className="input-field" placeholder={`Step ${i+1}…`} value={step} onChange={e=>updateStep(i,e.target.value)}
+                  rows={2} style={{resize:'none',lineHeight:1.5,fontSize:14}}/>
+              </div>
+              {steps.length>1&&(
+                <button onClick={()=>removeStep(i)} style={{background:'none',border:'none',color:T.muted,cursor:'pointer',fontSize:18,padding:'8px 4px',flexShrink:0}}>×</button>
+              )}
+            </div>
+          ))}
+          <button onClick={addStep} style={{background:'none',border:`1px dashed ${T.border}`,borderRadius:8,padding:'8px 16px',fontSize:13,color:T.brass,cursor:'pointer',width:'100%',marginTop:4}}>
+            + Add Step
+          </button>
+        </div>
+
+        {/* Notes */}
+        <div style={{marginBottom:32}}>
+          <label style={{fontSize:11,fontWeight:600,letterSpacing:'.12em',textTransform:'uppercase',color:T.brass,display:'block',marginBottom:8}}>Chef's Notes</label>
+          <textarea className="input-field" placeholder="Tips, substitutions, variations…" value={notes} onChange={e=>setNotes(e.target.value)}
+            rows={3} style={{resize:'none',lineHeight:1.6,fontSize:14}}/>
+        </div>
+
+        {/* Save */}
+        <button className="btn-brass" onClick={handleSave} disabled={!title.trim()||saving||ingredients.filter(i=>i.trim()).length===0}
+          style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:32}}>
+          {saving?<LoadingDots/>:<><Icon name="heartFill" size={15} color={T.white}/> Save to Favorites</>}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const RECIPE_SYS = `You are a professional chef and recipe writer. Format recipes as:
 # [Title]
 [One sentence description]
@@ -818,6 +999,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4
   const [saved,setSaved]=useState(false)
   const [error,setError]=useState('')
   const [showChat,setShowChat]=useState(false)
+  const [showCreate,setShowCreate]=useState(false)
   const [suggestions] = useState(getRandomSuggestions)
 
   const generate=async(text)=>{
@@ -840,11 +1022,17 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4
   return (
     <div style={{height:'100%',overflow:'auto',background:T.white}}>
       {showChat&&generated&&<RecipeChatPanel recipe={generated} onRecipeUpdate={handleUpdate} onClose={()=>setShowChat(false)}/>}
+      {showCreate&&<CreateRecipeForm onSave={async(r)=>{await onAddRecipe(r)}} onClose={()=>setShowCreate(false)}/>}
 
       <div style={{background:T.charcoal,padding:'32px 24px 24px',borderBottom:`1px solid ${T.border}`}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-          <Icon name="sparkle" size={20} color={T.brass}/>
-          <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Discover Recipes</h2>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <Icon name="sparkle" size={20} color={T.brass}/>
+            <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Discover Recipes</h2>
+          </div>
+          <button onClick={()=>setShowCreate(true)} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'7px 14px',color:T.brass,fontSize:12,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+            <Icon name="plus" size={13} color={T.brass}/>Create Own
+          </button>
         </div>
         <p style={{fontSize:13,color:T.muted}}>Ask AI for any recipe you're craving</p>
         {allergens.length>0&&(
@@ -866,11 +1054,36 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4
           </button>
         </div>
 
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:28}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
           {suggestions.map(s=>(
             <button key={s} onClick={()=>generate(s)} style={{background:T.offWhite,border:`1px solid ${T.borderLight}`,borderRadius:20,padding:'6px 14px',fontSize:12,color:T.charcoal,transition:'all .2s'}}>{s}</button>
           ))}
         </div>
+
+        {/* Budget button */}
+        <button onClick={()=>{
+          const meals=['Rice and beans with cumin-lime dressing','Pasta with garlic and olive oil','Lentil soup with spinach and lemon','Potato and egg hash','Chickpea coconut curry','Fried rice with vegetables and soy sauce','Black bean quesadillas','Tomato soup with grilled cheese','Spaghetti with marinara sauce','Omelette with whatever vegetables you have','Banana oat pancakes','Peanut butter noodles with cucumber','Tuna pasta salad','Bean and cheese burrito','Veggie stir fry with rice']
+          const pick=meals[Math.floor(Math.random()*meals.length)]
+          const budgetSys=RECIPE_SYS+allergenPromptText(allergens,defaultServings)+'\n\nThis must be a BUDGET-FRIENDLY recipe using inexpensive, everyday ingredients. Total cost should be under $10 to feed the family. Prioritize pantry staples, beans, rice, pasta, eggs, and affordable produce.'
+          setLoading(true);setSaved(false);setGenerated(null);setError('');setShowChat(false)
+          callClaude([{role:'user',content:`Create a budget-friendly recipe for: ${pick}`}],budgetSys)
+            .then(raw=>setGenerated({id:Date.now(),raw,photos:[],rating:0,createdAt:new Date().toISOString()}))
+            .catch(e=>setError(e.message||'Could not generate recipe.'))
+            .finally(()=>setLoading(false))
+        }} style={{
+          width:'100%',marginBottom:28,padding:'12px 20px',
+          background:'transparent',
+          border:`1.5px solid ${T.border}`,
+          borderRadius:10,cursor:'pointer',
+          display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+          fontSize:13,fontWeight:500,color:T.charcoal,
+          transition:'all .2s',
+        }}
+        onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.color=T.brassDark}}
+        onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.charcoal}}>
+          <span style={{fontSize:18}}>💰</span>
+          <span>Surprise me with a budget-friendly meal</span>
+        </button>
 
         {loading&&<div style={{background:T.charcoal,borderRadius:16,padding:'36px 24px',textAlign:'center',marginBottom:24}}><LoadingDots/><p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:18,color:T.white,marginTop:16}}>Crafting your recipe…</p></div>}
         {error&&<div style={{background:'rgba(239,154,154,.1)',border:'1px solid rgba(239,154,154,.3)',borderRadius:10,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#EF9A9A'}}>{error}</div>}
