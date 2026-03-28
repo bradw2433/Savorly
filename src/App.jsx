@@ -1487,8 +1487,7 @@ export default function App() {
     {id:'favorites',icon:'heart',label:'Favorites'},
     {id:'planner',icon:'calendar',label:'Planner'},
     {id:'shopping',icon:'cart',label:'Shop'},
-    {id:'pantry',icon:'fridge',label:'Pantry'},
-    {id:'prefs',icon:'settings',label:'Prefs'},
+    {id:'prefs',icon:'settings',label:'Preferences'},
   ]
 
   return shell(<>
@@ -1498,7 +1497,6 @@ export default function App() {
       {activeTab==='favorites'&&<FavoritesTab favorites={favorites} recipes={recipes} menus={menus} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} onCreateMenu={createMenu} onDeleteMenu={deleteMenu} onUpdate={handleUpdate}/>}
       {activeTab==='planner'&&<MealPlannerTab plan={plan} weekStart={weekStart} onAssign={assignRecipe} onClear={clearSlot} onGoWeek={goToWeek} favorites={favorites} onAddToList={addItems}/>}
       {activeTab==='shopping'&&<ShoppingListTab items={shoppingItems} onToggle={toggleItem} onRemove={removeItem} onClearChecked={clearChecked} onClearAll={clearAll}/>}
-      {activeTab==='pantry'&&<PantryTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} allergens={allergens} defaultServings={defaultServings}/>}
       {activeTab==='prefs'&&<PreferencesTab allergens={allergens} onSaveAllergens={saveAllergens} defaultServings={defaultServings} onSaveServings={saveDefaultServings}/>}
     </div>
     <div style={{background:T.charcoal,borderTop:`1px solid ${T.border}`,display:'flex',flexShrink:0,paddingBottom:'env(safe-area-inset-bottom)',width:'100%'}}>
