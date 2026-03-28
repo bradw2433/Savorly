@@ -4,16 +4,19 @@
   functions = "netlify/functions"
 
 [[redirects]]
-  from = "/*"
+  from = "/app"
   to = "/index.html"
   status = 200
 
-[functions]
-  node_bundler = "esbuild"
+[[redirects]]
+  from = "/app/*"
+  to = "/index.html"
+  status = 200
 
-[[headers]]
-  for = "/netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Headers = "Content-Type"
-    Access-Control-Allow-Methods = "POST, OPTIONS"
+[[redirects]]
+  from = "/"
+  to = "/landing.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "18"

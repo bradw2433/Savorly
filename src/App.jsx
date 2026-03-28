@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAuth } from './hooks/useAuth'
 import { useRecipes } from './hooks/useRecipes'
 import { usePreferences } from './hooks/usePreferences'
+import { useMealPlan } from './hooks/useMealPlan'
+import { useShoppingList } from './hooks/useShoppingList'
 import { callClaude } from './lib/api'
 import Auth from './components/Auth'
 
@@ -115,6 +117,36 @@ const splitIngredient = (ing) => {
   return { amount:'', name:ing }
 }
 
+// Smart fractions — converts decimals to unicode fraction characters
+const toFraction = (num) => {
+  const fractions = {0.125:'⅛',0.25:'¼',0.333:'⅓',0.375:'⅜',0.5:'½',0.625:'⅝',0.667:'⅔',0.75:'¾',0.875:'⅞'}
+  const whole = Math.floor(num)
+  const dec = Math.round((num - whole) * 1000) / 1000
+  const closestKey = Object.keys(fractions).find(k => Math.abs(parseFloat(k) - dec) < 0.04)
+  const fracStr = closestKey ? fractions[closestKey] : dec > 0 ? `${Math.round(dec*8)}/8` : ''
+  return whole > 0 ? (fracStr ? `${whole}${fracStr}` : `${whole}`) : fracStr || `${num}`
+}
+
+const prettifyAmount = (amountStr) => {
+  if (!amountStr) return ''
+  // Handle ranges like 4-6
+  if (/^\d+[-–]\d+$/.test(amountStr.trim())) return amountStr
+  const num = parseFloat(amountStr.replace(/[^\d.\/]/g,''))
+  if (isNaN(num)) return amountStr
+  // Handle fractions like 1/2
+  if (amountStr.includes('/')) {
+    const [n,d] = amountStr.split('/')
+    const val = parseFloat(n)/parseFloat(d)
+    return toFraction(val)
+  }
+  return toFraction(num)
+}
+
+const prettifyIngredient = (ing) => {
+  return ing.replace(/(\d+\.?\d*)\s*\/\s*(\d+)/g, (_, n, d) => toFraction(parseFloat(n)/parseFloat(d)))
+             .replace(/\b(\d+\.\d+)\b/g, (_, n) => toFraction(parseFloat(n)))
+}
+
 const LoadingDots = () => <div className="loading-dots"><span/><span/><span/></div>
 
 const Icon = ({ name, size=20, color='currentColor' }) => {
@@ -143,6 +175,8 @@ const Icon = ({ name, size=20, color='currentColor' }) => {
     send:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
     wand:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h0"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg>,
     shield:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+    cart:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>,
+    calendar:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
     settings:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   }
   return d[name]||null
@@ -383,7 +417,7 @@ const PolishedRecipeDetail = ({recipe, onClose, onUnfavorite, onUpdate}) => {
                 const {amount,name}=splitIngredient(ing)
                 return (
                   <div key={i} style={{display:'flex',alignItems:'baseline',gap:12,padding:'9px 0',borderBottom:`1px solid ${T.borderLight}`}}>
-                    <span style={{minWidth:90,fontSize:15,fontWeight:600,color:T.charcoal}}>{amount||'—'}</span>
+                    <span style={{minWidth:90,fontSize:15,fontWeight:600,color:T.charcoal}}>{prettifyAmount(amount)||'—'}</span>
                     <span style={{fontSize:15,color:T.charcoal,fontStyle:'italic'}}>{name}</span>
                   </div>
                 )
@@ -558,7 +592,7 @@ const RecipeDetail = ({recipe, onClose, onFavorite, isFavorited, onUpdate}) => {
             <div style={{marginBottom:32}}>{p.ingredients.map((ing,i)=>(
               <div key={i} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'10px 0',borderBottom:`1px solid ${T.borderLight}`}}>
                 <div style={{width:6,height:6,borderRadius:'50%',background:T.brass,marginTop:7,flexShrink:0}}/>
-                <span style={{fontSize:15,color:T.charcoal,lineHeight:1.5}}>{ing}</span>
+                <span style={{fontSize:15,color:T.charcoal,lineHeight:1.5}}>{prettifyIngredient(ing)}</span>
               </div>
             ))}</div>
             <BrassDivider label="Instructions"/>
@@ -1235,12 +1269,204 @@ const PantryTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[], default
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// MEAL PLANNER TAB
+// ══════════════════════════════════════════════════════════════════════════
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+const MEALS = ['Breakfast','Lunch','Dinner']
+
+const MealPlannerTab = ({plan, weekStart, onAssign, onClear, onGoWeek, favorites, onAddToList}) => {
+  const [selecting, setSelecting] = useState(null) // {day, meal}
+  const [addedToList, setAddedToList] = useState(false)
+
+  const weekDates = DAYS.map((_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + i)
+    return d
+  })
+
+  const formatDate = (d) => d.toLocaleDateString('en-US', {month:'short', day:'numeric'})
+
+  const buildShoppingList = () => {
+    const allIngredients = []
+    Object.values(plan).forEach(r => {
+      if (r?.raw) {
+        const p = parseRecipe(r.raw)
+        allIngredients.push(...p.ingredients)
+      }
+    })
+    onAddToList(allIngredients)
+    setAddedToList(true)
+    setTimeout(() => setAddedToList(false), 2500)
+  }
+
+  return (
+    <div style={{height:'100%',overflow:'auto',background:T.white}}>
+      <div style={{background:T.charcoal,padding:'32px 24px 20px',borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+          <Icon name="calendar" size={20} color={T.brass}/>
+          <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Meal Planner</h2>
+        </div>
+        <p style={{fontSize:13,color:T.muted,marginBottom:14}}>Plan your week, generate your shopping list</p>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <button onClick={()=>onGoWeek(-1)} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'6px 12px',color:T.muted,cursor:'pointer',fontSize:12}}>← Prev</button>
+          <span style={{fontSize:13,color:T.brassLight,fontWeight:500}}>
+            {formatDate(weekDates[0])} — {formatDate(weekDates[6])}
+          </span>
+          <button onClick={()=>onGoWeek(1)} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'6px 12px',color:T.muted,cursor:'pointer',fontSize:12}}>Next →</button>
+        </div>
+      </div>
+
+      <div style={{padding:'20px 16px'}}>
+        {DAYS.map((day, di) => (
+          <div key={day} style={{marginBottom:16,background:T.white,border:`1px solid ${T.borderLight}`,borderRadius:14,overflow:'hidden'}}>
+            <div style={{background:T.offWhite,padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${T.borderLight}`}}>
+              <span style={{fontFamily:"'Cormorant Garamond'",fontSize:17,fontWeight:500,color:T.charcoal}}>{day}</span>
+              <span style={{fontSize:11,color:T.muted}}>{formatDate(weekDates[di])}</span>
+            </div>
+            {MEALS.map(meal => {
+              const key = `${day}_${meal}`
+              const assigned = plan[key]
+              const title = assigned?.raw ? parseRecipe(assigned.raw).title : null
+              return (
+                <div key={meal} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px',borderBottom:`1px solid ${T.borderLight}`}}>
+                  <span style={{fontSize:11,color:T.muted,width:64,flexShrink:0,letterSpacing:'.04em'}}>{meal}</span>
+                  {title ? (
+                    <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                      <span style={{fontFamily:"'Cormorant Garamond'",fontSize:15,color:T.charcoal,fontStyle:'italic',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title}</span>
+                      <button onClick={()=>onClear(day,meal)} style={{background:'none',border:'none',color:T.muted,cursor:'pointer',fontSize:16,flexShrink:0,padding:'0 4px'}}>×</button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>setSelecting({day,meal})} style={{flex:1,background:'none',border:`1px dashed ${T.borderLight}`,borderRadius:8,padding:'6px 12px',fontSize:12,color:T.muted,cursor:'pointer',textAlign:'left',transition:'all .2s'}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.color=T.brass}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderLight;e.currentTarget.style.color=T.muted}}>
+                      + Add recipe
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+
+        <button onClick={buildShoppingList} className="btn-brass" style={{width:'100%',marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+          {addedToList ? <><Icon name="check" size={15} color={T.white}/> Added to Shopping List!</> : <><Icon name="cart" size={15} color={T.white}/> Generate Shopping List</>}
+        </button>
+      </div>
+
+      {/* Recipe picker modal */}
+      {selecting && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',zIndex:200,display:'flex',alignItems:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setSelecting(null)}>
+          <div className="scale-in" style={{background:T.white,borderRadius:'20px 20px 0 0',width:'100%',maxHeight:'75vh',overflow:'auto',paddingBottom:'env(safe-area-inset-bottom)'}}>
+            <div style={{display:'flex',justifyContent:'center',padding:'12px 0 4px'}}>
+              <div style={{width:40,height:4,borderRadius:2,background:T.borderLight}}/>
+            </div>
+            <div style={{padding:'8px 24px 24px'}}>
+              <h3 style={{fontFamily:"'Cormorant Garamond'",fontSize:22,fontWeight:500,color:T.charcoal,marginBottom:16}}>
+                {selecting.meal} · {selecting.day}
+              </h3>
+              {favorites.length === 0 ? (
+                <p style={{fontSize:14,color:T.muted,fontStyle:'italic',textAlign:'center',padding:'24px 0'}}>Save some favorites first to add them to your meal plan.</p>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  {favorites.map(r => {
+                    const p = parseRecipe(r.raw)
+                    return (
+                      <button key={r.id} onClick={()=>{ onAssign(selecting.day,selecting.meal,r); setSelecting(null) }}
+                        style={{display:'flex',alignItems:'center',gap:14,padding:'12px 14px',background:T.offWhite,border:`1px solid ${T.borderLight}`,borderRadius:12,cursor:'pointer',transition:'all .2s',textAlign:'left'}}
+                        onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass}}
+                        onMouseLeave={e=>{e.currentTarget.style.background=T.offWhite;e.currentTarget.style.borderColor=T.borderLight}}>
+                        <div style={{width:44,height:44,borderRadius:10,background:T.charcoal,overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {r.photos?.[0] ? <img src={r.photos[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="chef" size={20} color={T.brass}/>}
+                        </div>
+                        <div>
+                          <div style={{fontFamily:"'Cormorant Garamond'",fontSize:17,fontWeight:500,color:T.charcoal}}>{p.title}</div>
+                          <div style={{fontSize:11,color:T.muted,marginTop:2}}>{p.prepTime&&`Prep ${p.prepTime}`}{p.cookTime&&` · Cook ${p.cookTime}`}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SHOPPING LIST TAB
+// ══════════════════════════════════════════════════════════════════════════
+const CATEGORY_LABELS = { produce:'🥬 Produce', meat:'🥩 Meat & Seafood', dairy:'🧀 Dairy & Eggs', pantry:'🫙 Pantry', canned:'🥫 Canned Goods', other:'📦 Other' }
+
+const ShoppingListTab = ({items, onToggle, onRemove, onClearChecked, onClearAll}) => {
+  const checkedCount = items.filter(i=>i.checked).length
+  const grouped = {}
+  items.forEach(item => {
+    const cat = item.category || 'other'
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push(item)
+  })
+  const catOrder = ['produce','meat','dairy','pantry','canned','other']
+
+  return (
+    <div style={{height:'100%',overflow:'auto',background:T.white}}>
+      <div style={{background:T.charcoal,padding:'32px 24px 20px',borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+          <Icon name="cart" size={20} color={T.brass}/>
+          <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Shopping List</h2>
+        </div>
+        <p style={{fontSize:13,color:T.muted,marginBottom:items.length>0?14:0}}>
+          {items.length===0 ? 'Generate from your meal plan' : `${items.length - checkedCount} items remaining`}
+        </p>
+        {items.length>0&&(
+          <div style={{display:'flex',gap:10}}>
+            {checkedCount>0&&<button onClick={onClearChecked} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'6px 14px',color:T.muted,fontSize:12,cursor:'pointer'}}>Clear checked ({checkedCount})</button>}
+            <button onClick={onClearAll} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'6px 14px',color:T.muted,fontSize:12,cursor:'pointer'}}>Clear all</button>
+          </div>
+        )}
+      </div>
+
+      <div style={{padding:'20px 16px'}}>
+        {items.length===0 ? (
+          <div style={{textAlign:'center',padding:'60px 24px',color:T.muted}}>
+            <Icon name="cart" size={56} color={T.border}/>
+            <p style={{marginTop:16,fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:22,color:T.charcoal}}>Your list is empty</p>
+            <p style={{fontSize:14,marginTop:8,lineHeight:1.6}}>Build your meal plan and tap<br/>"Generate Shopping List"</p>
+          </div>
+        ) : (
+          catOrder.filter(cat=>grouped[cat]?.length>0).map(cat=>(
+            <div key={cat} style={{marginBottom:24}}>
+              <div style={{fontSize:13,fontWeight:500,color:T.brass,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${T.borderLight}`}}>
+                {CATEGORY_LABELS[cat]}
+              </div>
+              {grouped[cat].map(item=>(
+                <div key={item.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 4px',borderBottom:`1px solid ${T.borderLight}`,opacity:item.checked?.6:1,transition:'opacity .2s'}}>
+                  <button onClick={()=>onToggle(item.id)} style={{width:24,height:24,borderRadius:6,border:`1.5px solid ${item.checked?T.brass:T.borderLight}`,background:item.checked?T.brass:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .2s'}}>
+                    {item.checked&&<Icon name="check" size={12} color={T.white}/>}
+                  </button>
+                  <span style={{flex:1,fontSize:15,color:T.charcoal,textDecoration:item.checked?'line-through':'none',fontFamily:"'Cormorant Garamond'",fontStyle:'italic'}}>{prettifyIngredient(item.name)}</span>
+                  <button onClick={()=>onRemove(item.id)} style={{background:'none',border:'none',color:T.muted,cursor:'pointer',fontSize:16,padding:'0 4px',opacity:.5}}>×</button>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════════════════════
 export default function App() {
   const {user,loading:authLoading,signIn,signUp,signOut,resetPassword}=useAuth()
   const {recipes,favorites,menus,loading:recipesLoading,addRecipe,updateRecipe,toggleFavorite,deleteRecipe,createMenu,deleteMenu}=useRecipes(user)
   const {allergens,saveAllergens,defaultServings,saveDefaultServings}=usePreferences(user)
+  const {plan,weekStart,assignRecipe,clearSlot,goToWeek}=useMealPlan(user)
+  const {items:shoppingItems,addItems,toggleItem,removeItem,clearChecked,clearAll}=useShoppingList(user)
   const [activeTab,setActiveTab]=useState('discover')
   const [viewingRecipe,setViewingRecipe]=useState(null)
 
@@ -1259,8 +1485,10 @@ export default function App() {
   const tabs=[
     {id:'discover',icon:'sparkle',label:'Discover'},
     {id:'favorites',icon:'heart',label:'Favorites'},
+    {id:'planner',icon:'calendar',label:'Planner'},
+    {id:'shopping',icon:'cart',label:'Shop'},
     {id:'pantry',icon:'fridge',label:'Pantry'},
-    {id:'prefs',icon:'settings',label:'Preferences'},
+    {id:'prefs',icon:'settings',label:'Prefs'},
   ]
 
   return shell(<>
@@ -1268,6 +1496,8 @@ export default function App() {
     <div style={{flex:1,overflow:'hidden',position:'relative'}}>
       {activeTab==='discover'&&<DiscoverTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} allergens={allergens} defaultServings={defaultServings}/>}
       {activeTab==='favorites'&&<FavoritesTab favorites={favorites} recipes={recipes} menus={menus} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} onCreateMenu={createMenu} onDeleteMenu={deleteMenu} onUpdate={handleUpdate}/>}
+      {activeTab==='planner'&&<MealPlannerTab plan={plan} weekStart={weekStart} onAssign={assignRecipe} onClear={clearSlot} onGoWeek={goToWeek} favorites={favorites} onAddToList={addItems}/>}
+      {activeTab==='shopping'&&<ShoppingListTab items={shoppingItems} onToggle={toggleItem} onRemove={removeItem} onClearChecked={clearChecked} onClearAll={clearAll}/>}
       {activeTab==='pantry'&&<PantryTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} allergens={allergens} defaultServings={defaultServings}/>}
       {activeTab==='prefs'&&<PreferencesTab allergens={allergens} onSaveAllergens={saveAllergens} defaultServings={defaultServings} onSaveServings={saveDefaultServings}/>}
     </div>
@@ -1275,18 +1505,18 @@ export default function App() {
       {tabs.map(tab=>{
         const isActive=activeTab===tab.id
         return (
-          <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{flex:1,padding:'12px 4px 10px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:4,color:isActive?T.brass:T.muted,transition:'all .2s',position:'relative',cursor:'pointer'}}>
-            {isActive&&<div style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:32,height:2,borderRadius:'0 0 2px 2px',background:`linear-gradient(90deg,${T.brass},${T.brassLight})`}}/>}
+          <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{flex:1,padding:'10px 2px 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:isActive?T.brass:T.muted,transition:'all .2s',position:'relative',cursor:'pointer'}}>
+            {isActive&&<div style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:28,height:2,borderRadius:'0 0 2px 2px',background:`linear-gradient(90deg,${T.brass},${T.brassLight})`}}/>}
             <div style={{transform:isActive?'scale(1.1)':'scale(1)',transition:'transform .2s'}}>
-              <Icon name={isActive&&tab.id==='favorites'?'heartFill':tab.icon} size={22} color={isActive?T.brass:T.muted}/>
+              <Icon name={isActive&&tab.id==='favorites'?'heartFill':tab.icon} size={20} color={isActive?T.brass:T.muted}/>
             </div>
-            <span style={{fontSize:10,fontWeight:500,letterSpacing:'.05em',textTransform:'uppercase'}}>{tab.label}</span>
+            <span style={{fontSize:9,fontWeight:500,letterSpacing:'.04em',textTransform:'uppercase'}}>{tab.label}</span>
           </button>
         )
       })}
-      <button onClick={signOut} style={{flex:1,padding:'12px 4px 10px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:4,color:T.muted,cursor:'pointer'}}>
+      <button onClick={signOut} style={{flex:1,padding:'10px 2px 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:3,color:T.muted,cursor:'pointer'}}>
         <Icon name="logout" size={20} color={T.muted}/>
-        <span style={{fontSize:10,fontWeight:500,letterSpacing:'.05em',textTransform:'uppercase'}}>Out</span>
+        <span style={{fontSize:9,fontWeight:500,letterSpacing:'.04em',textTransform:'uppercase'}}>Out</span>
       </button>
     </div>
     {viewingRecipe&&<RecipeDetail recipe={viewingRecipe} onClose={()=>setViewingRecipe(null)} onFavorite={handleFavorite} isFavorited={favorites.some(f=>f.id===viewingRecipe.id)} onUpdate={handleUpdate}/>}
