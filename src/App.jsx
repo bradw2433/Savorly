@@ -1281,7 +1281,7 @@ const getRandomSuggestions = () => {
   return shuffled.slice(0, 6)
 }
 
-const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[], defaultServings=4}) => {
+const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, allergens=[], defaultServings=4}) => {
   const [prompt,setPrompt]=useState('')
   const [loading,setLoading]=useState(false)
   const [generated,setGenerated]=useState(null)
@@ -1290,6 +1290,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[], defau
   const [showChat,setShowChat]=useState(false)
   const [showCreate,setShowCreate]=useState(false)
   const [showImport,setShowImport]=useState(false)
+  const [showPlannerPicker,setShowPlannerPicker]=useState(false)
   const [suggestions] = useState(getRandomSuggestions)
 
   const generate=async(text)=>{
@@ -1432,10 +1433,49 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[], defau
 
               <div style={{display:'flex',gap:10,marginTop:10}}>
                 <button className="btn-brass" onClick={saveCol} disabled={saved} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                  {saved?<><Icon name="heartFill" size={15} color={T.white}/> Saved to Favorites!</>:<><Icon name="heart" size={15} color={T.white}/> Save to Favorites</>}
+                  {saved?<><Icon name="heartFill" size={15} color={T.white}/> Saved!</>:<><Icon name="heart" size={15} color={T.white}/> Favorite</>}
+                </button>
+                <button onClick={()=>setShowPlannerPicker(true)} style={{flex:1,background:'none',border:`1.5px solid ${T.border}`,borderRadius:8,padding:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontSize:13,fontWeight:500,color:T.brass,cursor:'pointer',transition:'all .2s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass}}
+                  onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.borderColor=T.border}}>
+                  <Icon name="calendar" size={15} color={T.brass}/>
+                  Add to Planner
                 </button>
               </div>
               {!saved&&<p style={{fontSize:11,color:T.muted,textAlign:'center',marginTop:8}}>Tap the title above to read the full recipe</p>}
+
+              {/* Planner picker */}
+              {showPlannerPicker&&generated&&(
+                <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',zIndex:300,display:'flex',alignItems:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setShowPlannerPicker(false)}>
+                  <div className="scale-in" style={{background:T.white,borderRadius:'20px 20px 0 0',width:'100%',maxHeight:'80vh',overflow:'auto',paddingBottom:'env(safe-area-inset-bottom)'}}>
+                    <div style={{display:'flex',justifyContent:'center',padding:'12px 0 4px'}}>
+                      <div style={{width:40,height:4,borderRadius:2,background:T.borderLight}}/>
+                    </div>
+                    <div style={{padding:'8px 24px 28px'}}>
+                      <h3 style={{fontFamily:"'Cormorant Garamond'",fontSize:22,fontWeight:500,color:T.charcoal,marginBottom:4}}>Add to Planner</h3>
+                      <p style={{fontSize:13,color:T.muted,marginBottom:20}}>{p?.title} — choose a day and meal</p>
+                      {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=>(
+                        <div key={day} style={{marginBottom:12}}>
+                          <div style={{fontSize:11,fontWeight:600,letterSpacing:'.1em',textTransform:'uppercase',color:T.brass,marginBottom:8}}>{day}</div>
+                          <div style={{display:'flex',gap:8}}>
+                            {['Breakfast','Lunch','Dinner'].map(meal=>(
+                              <button key={meal} onClick={async()=>{
+                                if(onAddToPlanner) await onAddToPlanner(day, meal, generated)
+                                setShowPlannerPicker(false)
+                              }} style={{flex:1,padding:'10px 4px',background:T.offWhite,border:`1px solid ${T.borderLight}`,borderRadius:8,fontSize:11,color:T.charcoal,cursor:'pointer',transition:'all .2s'}}
+                                onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.color=T.brassDark}}
+                                onMouseLeave={e=>{e.currentTarget.style.background=T.offWhite;e.currentTarget.style.borderColor=T.borderLight;e.currentTarget.style.color=T.charcoal}}>
+                                {meal}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <button className="btn-ghost" onClick={()=>setShowPlannerPicker(false)} style={{width:'100%',marginTop:8}}>Cancel</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1909,7 +1949,9 @@ const MealPlannerTab = ({plan, weekStart, onAssign, onClear, onGoWeek, favorites
 // ══════════════════════════════════════════════════════════════════════════
 const CATEGORY_LABELS = { produce:'🥬 Produce', meat:'🥩 Meat & Seafood', dairy:'🧀 Dairy & Eggs', pantry:'🫙 Pantry', canned:'🥫 Canned Goods', other:'📦 Other' }
 
-const ShoppingListTab = ({items, onToggle, onRemove, onClearChecked, onClearAll}) => {
+const ShoppingListTab = ({items, onToggle, onRemove, onClearChecked, onClearAll, onAddItems}) => {
+  const [newItem, setNewItem] = useState('')
+  const inputRef = useRef()
   const checkedCount = items.filter(i=>i.checked).length
   const grouped = {}
   items.forEach(item => {
@@ -1919,6 +1961,14 @@ const ShoppingListTab = ({items, onToggle, onRemove, onClearChecked, onClearAll}
   })
   const catOrder = ['produce','meat','dairy','pantry','canned','other']
 
+  const addManualItem = () => {
+    const val = newItem.trim()
+    if (!val) return
+    onAddItems([val])
+    setNewItem('')
+    inputRef.current?.focus()
+  }
+
   return (
     <div style={{height:'100%',overflow:'auto',background:T.white}}>
       <div style={{background:T.charcoal,padding:'32px 24px 20px',borderBottom:`1px solid ${T.border}`}}>
@@ -1926,8 +1976,8 @@ const ShoppingListTab = ({items, onToggle, onRemove, onClearChecked, onClearAll}
           <Icon name="cart" size={20} color={T.brass}/>
           <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Shopping List</h2>
         </div>
-        <p style={{fontSize:13,color:T.muted,marginBottom:items.length>0?14:0}}>
-          {items.length===0 ? 'Generate from your meal plan' : `${items.length - checkedCount} items remaining`}
+        <p style={{fontSize:13,color:T.muted,marginBottom:14}}>
+          {items.length===0 ? 'Add items manually or generate from your meal plan' : `${items.length - checkedCount} of ${items.length} items remaining`}
         </p>
         {items.length>0&&(
           <div style={{display:'flex',gap:10}}>
@@ -1937,12 +1987,31 @@ const ShoppingListTab = ({items, onToggle, onRemove, onClearChecked, onClearAll}
         )}
       </div>
 
+      {/* Manual add input — always visible */}
+      <div style={{padding:'16px 16px 0',borderBottom:`1px solid ${T.borderLight}`,background:T.offWhite}}>
+        <div style={{display:'flex',gap:8}}>
+          <input
+            ref={inputRef}
+            className="input-field"
+            placeholder="Add an item… e.g. olive oil, 2 lemons"
+            value={newItem}
+            onChange={e=>setNewItem(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&addManualItem()}
+            style={{flex:1,padding:'11px 16px',fontSize:14}}
+          />
+          <button onClick={addManualItem} disabled={!newItem.trim()} style={{width:44,height:44,border:'none',borderRadius:10,background:newItem.trim()?`linear-gradient(135deg,${T.brass},${T.brassDark})`:T.borderLight,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,cursor:newItem.trim()?'pointer':'default',transition:'all .2s'}}>
+            <Icon name="plus" size={18} color={newItem.trim()?T.white:T.muted}/>
+          </button>
+        </div>
+        <p style={{fontSize:11,color:T.muted,padding:'6px 4px 12px'}}>Press Enter or tap + to add • Items auto-sort by category</p>
+      </div>
+
       <div style={{padding:'20px 16px'}}>
         {items.length===0 ? (
-          <div style={{textAlign:'center',padding:'60px 24px',color:T.muted}}>
+          <div style={{textAlign:'center',padding:'48px 24px',color:T.muted}}>
             <Icon name="cart" size={56} color={T.border}/>
             <p style={{marginTop:16,fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:22,color:T.charcoal}}>Your list is empty</p>
-            <p style={{fontSize:14,marginTop:8,lineHeight:1.6}}>Build your meal plan and tap<br/>"Generate Shopping List"</p>
+            <p style={{fontSize:14,marginTop:8,lineHeight:1.6,color:T.muted}}>Type an item above, or go to<br/>Planner → Generate Shopping List</p>
           </div>
         ) : (
           catOrder.filter(cat=>grouped[cat]?.length>0).map(cat=>(
@@ -2002,10 +2071,10 @@ export default function App() {
   return shell(<>
     <div style={{height:3,background:`linear-gradient(90deg,${T.brass},${T.brassDark},${T.brass})`,flexShrink:0}}/>
     <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-      {activeTab==='discover'&&<DiscoverTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} allergens={allergens} defaultServings={defaultServings}/>}
+      {activeTab==='discover'&&<DiscoverTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} onAddToPlanner={assignRecipe} allergens={allergens} defaultServings={defaultServings}/>}
       {activeTab==='favorites'&&<FavoritesTab favorites={favorites} recipes={recipes} menus={menus} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} onCreateMenu={createMenu} onDeleteMenu={deleteMenu} onUpdate={handleUpdate}/>}
       {activeTab==='planner'&&<MealPlannerTab plan={plan} weekStart={weekStart} onAssign={assignRecipe} onClear={clearSlot} onGoWeek={goToWeek} favorites={favorites} onAddToList={addItems}/>}
-      {activeTab==='shopping'&&<ShoppingListTab items={shoppingItems} onToggle={toggleItem} onRemove={removeItem} onClearChecked={clearChecked} onClearAll={clearAll}/>}
+      {activeTab==='shopping'&&<ShoppingListTab items={shoppingItems} onToggle={toggleItem} onRemove={removeItem} onClearChecked={clearChecked} onClearAll={clearAll} onAddItems={addItems}/>}
       {activeTab==='prefs'&&<PreferencesTab allergens={allergens} onSaveAllergens={saveAllergens} defaultServings={defaultServings} onSaveServings={saveDefaultServings}/>}
     </div>
     <div style={{background:T.charcoal,borderTop:`1px solid ${T.border}`,display:'flex',flexShrink:0,paddingBottom:'env(safe-area-inset-bottom)',width:'100%'}}>
