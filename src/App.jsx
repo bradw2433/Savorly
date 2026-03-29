@@ -1311,7 +1311,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, all
   const p = generated ? parseRecipe(generated.raw) : null
 
   return (
-    <div style={{height:'100%',overflow:'auto',background:T.white}}>
+    <div style={{height:'100%',overflow:'auto',background:T.black}}>
       {showChat&&generated&&<RecipeChatPanel recipe={generated} onRecipeUpdate={handleUpdate} onClose={()=>setShowChat(false)}/>}
       {showCreate&&<CreateRecipeForm onSave={async(r)=>{await onAddRecipe(r)}} onClose={()=>setShowCreate(false)}/>}
       {showImport&&<ImportRecipeModal onSave={async(r)=>{await onFavorite(r)}} onClose={()=>setShowImport(false)}/>}
@@ -1340,21 +1340,21 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, all
         )}
       </div>
 
-      <div style={{padding:24}}>
+      <div style={{padding:24,background:T.black}}>
         <div style={{position:'relative',marginBottom:16}}>
           <input className="input-field" placeholder="e.g. 'A cozy French onion soup'" value={prompt}
             onChange={e=>setPrompt(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&prompt.trim()&&generate(prompt.trim())}
-            style={{paddingRight:56}}/>
+            style={{paddingRight:56,background:'rgba(255,255,255,.06)',border:`1px solid ${T.border}`,color:T.white}}/>
           <button onClick={()=>prompt.trim()&&generate(prompt.trim())} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',width:36,height:36,border:'none',borderRadius:8,background:`linear-gradient(135deg,${T.brass},${T.brassDark})`,display:'flex',alignItems:'center',justifyContent:'center'}}>
             <Icon name="search" size={16} color={T.white}/>
           </button>
         </div>
 
         <div style={{fontSize:10,fontWeight:600,letterSpacing:'.14em',textTransform:'uppercase',color:T.muted,marginBottom:8,fontFamily:"'Jost',sans-serif"}}>Quick picks</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>
           {suggestions.map(s=>(
-            <button key={s} onClick={()=>generate(s)} style={{background:T.offWhite,border:`1px solid ${T.borderLight}`,borderRadius:20,padding:'6px 14px',fontSize:12,color:T.charcoal,transition:'all .2s'}}>{s}</button>
+            <button key={s} onClick={()=>generate(s)} style={{background:'rgba(255,255,255,.06)',border:`1px solid ${T.border}`,borderRadius:20,padding:'6px 14px',fontSize:12,color:T.brassLight,transition:'all .2s'}}>{s}</button>
           ))}
         </div>
 
@@ -1413,7 +1413,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, all
         {error&&<div style={{background:'rgba(239,154,154,.1)',border:'1px solid rgba(239,154,154,.3)',borderRadius:10,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#EF9A9A'}}>{error}</div>}
 
         {p&&!loading&&(
-          <div className="scale-in" style={{background:T.white,borderRadius:16,border:`1px solid ${T.border}`,overflow:'hidden',marginBottom:24,boxShadow:'0 8px 32px rgba(0,0,0,.08)'}}>
+          <div className="scale-in" style={{background:'#111111',borderRadius:16,border:`1px solid ${T.border}`,overflow:'hidden',marginBottom:24}}>
             <div onClick={()=>onOpenRecipe(generated)} style={{background:T.charcoal,padding:'20px 24px',cursor:'pointer'}}>
               <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:26,fontWeight:400,color:T.white,marginBottom:6}}>{p.title}</h2>
               {p.description&&<p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:15,color:T.muted}}>{p.description}</p>}
@@ -1427,9 +1427,9 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, all
             <div style={{padding:'20px 24px'}}>
               <BrassDivider label="Ingredients"/>
               {p.ingredients.slice(0,6).map((ing,i)=>(
-                <div key={i} style={{display:'flex',gap:10,padding:'7px 0',borderBottom:`1px solid ${T.borderLight}`}}>
+                <div key={i} style={{display:'flex',gap:10,padding:'7px 0',borderBottom:`1px solid rgba(168,160,144,.1)`}}>
                   <div style={{width:5,height:5,borderRadius:'50%',background:T.brass,marginTop:8,flexShrink:0}}/>
-                  <span style={{fontSize:14,color:T.charcoal}}>{ing}</span>
+                  <span style={{fontSize:14,color:T.white,opacity:.85}}>{prettifyIngredient(ing)}</span>
                 </div>
               ))}
               {p.ingredients.length>6&&<p style={{fontSize:13,color:T.muted,marginTop:8,fontStyle:'italic'}}>+{p.ingredients.length-6} more…</p>}
@@ -1437,23 +1437,23 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, all
               {p.steps.slice(0,3).map((step,i)=>(
                 <div key={i} style={{display:'flex',gap:12,marginBottom:14}}>
                   <div style={{width:26,height:26,borderRadius:'50%',flexShrink:0,background:`linear-gradient(135deg,${T.brass},${T.brassDark})`,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Cormorant Garamond'",fontSize:14,color:T.white}}>{i+1}</div>
-                  <p style={{fontSize:14,color:T.charcoal,lineHeight:1.6,paddingTop:3}}>{step}</p>
+                  <p style={{fontSize:14,color:T.white,opacity:.8,lineHeight:1.6,paddingTop:3}}>{step}</p>
                 </div>
               ))}
               {p.steps.length>3&&<p style={{fontSize:13,color:T.muted,fontStyle:'italic'}}>+{p.steps.length-3} more steps…</p>}
 
               {/* View Full button */}
-              <button onClick={()=>onOpenRecipe(generated)} style={{width:'100%',marginTop:20,padding:'13px',background:T.offWhite,border:`1.5px solid ${T.border}`,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontSize:13,fontWeight:500,color:T.charcoal,letterSpacing:'.04em',transition:'all .2s'}}
-                onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.color=T.brassDark}}
-                onMouseLeave={e=>{e.currentTarget.style.background=T.offWhite;e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.charcoal}}>
+              <button onClick={()=>onOpenRecipe(generated)} style={{width:'100%',marginTop:20,padding:'13px',background:'rgba(168,160,144,.08)',border:`1.5px solid ${T.border}`,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontSize:13,fontWeight:500,color:T.brassLight,letterSpacing:'.04em',transition:'all .2s'}}
+                onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass}}
+                onMouseLeave={e=>{e.currentTarget.style.background='rgba(168,160,144,.08)';e.currentTarget.style.borderColor=T.border}}>
                 <Icon name="sparkle" size={15} color={T.brass}/>
                 View Full Recipe
               </button>
 
               {/* Chat button */}
-              <button onClick={()=>setShowChat(true)} style={{width:'100%',marginTop:10,padding:'13px',background:T.offWhite,border:`1.5px solid ${T.border}`,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontSize:13,fontWeight:500,color:T.charcoal,letterSpacing:'.04em',transition:'all .2s'}}
-                onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.color=T.brassDark}}
-                onMouseLeave={e=>{e.currentTarget.style.background=T.offWhite;e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.charcoal}}>
+              <button onClick={()=>setShowChat(true)} style={{width:'100%',marginTop:10,padding:'13px',background:'rgba(168,160,144,.08)',border:`1.5px solid ${T.border}`,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontSize:13,fontWeight:500,color:T.brassLight,letterSpacing:'.04em',transition:'all .2s'}}
+                onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass}}
+                onMouseLeave={e=>{e.currentTarget.style.background='rgba(168,160,144,.08)';e.currentTarget.style.borderColor=T.border}}>
                 <Icon name="chat" size={16} color={T.brass}/>
                 Modify this recipe with AI chat
               </button>
