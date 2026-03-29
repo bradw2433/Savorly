@@ -892,6 +892,189 @@ const PreferencesTab = ({ allergens, onSaveAllergens, defaultServings, onSaveSer
 // ══════════════════════════════════════════════════════════════════════════
 // CREATE YOUR OWN RECIPE
 // ══════════════════════════════════════════════════════════════════════════
+const ImportRecipeModal = ({onSave, onClose}) => {
+  const [mode, setMode] = useState('choice')
+  const [photos, setPhotos] = useState([])
+  const [pasteText, setPasteText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [preview, setPreview] = useState(null)
+  const fileRef = useRef()
+
+  const IMPORT_SYS = `You are a professional recipe transcriber. Extract and format the recipe in this EXACT format:
+# [Recipe Title]
+[One sentence description]
+Prep Time: X minutes
+Cook Time: X minutes
+Serves: N
+## Ingredients
+- [precise amount] [ingredient]
+## Instructions
+1. [Clear step]
+## Notes
+[Optional tips]
+Fill in any obvious gaps. If quantities are missing, estimate reasonable amounts.`
+
+  const addPhotos = (e) => {
+    Array.from(e.target.files).forEach(file => {
+      const reader = new FileReader()
+      reader.onload = ev => setPhotos(prev => [...prev, { src: ev.target.result, file }])
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const importFromPhotos = async () => {
+    if (!photos.length) return
+    setLoading(true); setError('')
+    try {
+      const b64s = await Promise.all(photos.map(p => toBase64(p.file)))
+      const content = [
+        ...b64s.map(b64 => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } })),
+        { type: 'text', text: 'Please read this recipe card/page and transcribe it into a complete, well-formatted recipe. Include all ingredients with precise measurements and clear step-by-step instructions.' }
+      ]
+      const raw = await callClaude([{ role: 'user', content }], IMPORT_SYS)
+      setPreview({ id: Date.now(), raw, photos: [], rating: 0, createdAt: new Date().toISOString() })
+    } catch (e) { setError(e.message || 'Could not read recipe. Try a clearer photo.') }
+    setLoading(false)
+  }
+
+  const importFromText = async () => {
+    if (!pasteText.trim()) return
+    setLoading(true); setError('')
+    try {
+      const raw = await callClaude([{ role: 'user', content: `Please extract and format this recipe:\n\n${pasteText}` }], IMPORT_SYS)
+      setPreview({ id: Date.now(), raw, photos: [], rating: 0, createdAt: new Date().toISOString() })
+    } catch (e) { setError(e.message || 'Could not parse recipe. Please try again.') }
+    setLoading(false)
+  }
+
+  const handleSave = async () => {
+    if (!preview) return
+    await onSave(preview)
+    onClose()
+  }
+
+  const p = preview ? parseRecipe(preview.raw) : null
+
+  return (
+    <div style={{position:'fixed',inset:0,background:T.white,zIndex:200,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      <div style={{background:T.charcoal,padding:'20px 24px',display:'flex',alignItems:'center',gap:14,flexShrink:0,borderBottom:`1px solid ${T.border}`}}>
+        <button onClick={preview?()=>setPreview(null):onClose} style={{background:'none',border:'none',cursor:'pointer'}}>
+          <Icon name="back" size={20} color={T.white}/>
+        </button>
+        <div>
+          <div style={{fontFamily:"'Cormorant Garamond'",fontSize:22,fontWeight:400,color:T.white}}>{preview?'Review Recipe':'Import Recipe'}</div>
+          <div style={{fontSize:11,color:T.muted}}>{preview?'Looks good? Save it to favorites.':'From a photo or pasted text'}</div>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflow:'auto',padding:24}}>
+        {preview && p && (
+          <div className="scale-in">
+            <div style={{background:T.charcoal,borderRadius:14,padding:'20px',marginBottom:20}}>
+              <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:24,fontWeight:400,color:T.white,marginBottom:6}}>{p.title}</h2>
+              {p.description&&<p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:14,color:T.muted}}>{p.description}</p>}
+              <div style={{display:'flex',gap:16,marginTop:10}}>
+                {p.prepTime&&<span style={{fontSize:12,color:T.brassLight}}>Prep: {p.prepTime}</span>}
+                {p.cookTime&&<span style={{fontSize:12,color:T.brassLight}}>Cook: {p.cookTime}</span>}
+                {p.servings&&<span style={{fontSize:12,color:T.brassLight}}>Serves {p.servings}</span>}
+              </div>
+            </div>
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,fontWeight:600,letterSpacing:'.14em',textTransform:'uppercase',color:T.brass,marginBottom:12}}>Ingredients</div>
+              {p.ingredients.map((ing,i)=>(
+                <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:`1px solid ${T.borderLight}`}}>
+                  <div style={{width:5,height:5,borderRadius:'50%',background:T.brass,marginTop:8,flexShrink:0}}/>
+                  <span style={{fontSize:14,color:T.charcoal}}>{prettifyIngredient(ing)}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{marginBottom:28}}>
+              <div style={{fontSize:11,fontWeight:600,letterSpacing:'.14em',textTransform:'uppercase',color:T.brass,marginBottom:12}}>Instructions</div>
+              {p.steps.map((step,i)=>(
+                <div key={i} style={{display:'flex',gap:12,marginBottom:14}}>
+                  <div style={{width:26,height:26,borderRadius:'50%',flexShrink:0,background:`linear-gradient(135deg,${T.brass},${T.brassDark})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:T.white,fontFamily:"'Cormorant Garamond'"}}>{i+1}</div>
+                  <p style={{fontSize:14,color:T.charcoal,lineHeight:1.6,paddingTop:3}}>{step}</p>
+                </div>
+              ))}
+            </div>
+            <button className="btn-brass" onClick={handleSave} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:12}}>
+              <Icon name="heartFill" size={15} color={T.white}/> Save to Favorites
+            </button>
+            <button className="btn-ghost" onClick={()=>setPreview(null)} style={{width:'100%'}}>Try Again</button>
+          </div>
+        )}
+
+        {!preview && mode==='choice' && (
+          <div className="scale-in">
+            <p style={{fontSize:15,color:T.muted,marginBottom:28,lineHeight:1.6,fontFamily:"'Cormorant Garamond'",fontStyle:'italic'}}>Import any recipe — from a handwritten card, cookbook page, screenshot, or just paste the text.</p>
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              {[
+                {m:'photo',icon:'📷',title:'Photo of a Recipe',desc:'Take a photo of a recipe card, cookbook page, or handwritten recipe. AI will read and transcribe it.'},
+                {m:'text',icon:'📋',title:'Paste Text or URL',desc:'Copy a recipe from a website or message and paste it here. AI will format it beautifully.'},
+              ].map(opt=>(
+                <button key={opt.m} onClick={()=>setMode(opt.m)} style={{background:T.offWhite,border:`1.5px solid ${T.borderLight}`,borderRadius:16,padding:'24px',textAlign:'left',cursor:'pointer',transition:'all .2s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.background=T.brassGlow}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderLight;e.currentTarget.style.background=T.offWhite}}>
+                  <div style={{fontSize:32,marginBottom:10}}>{opt.icon}</div>
+                  <div style={{fontFamily:"'Cormorant Garamond'",fontSize:20,fontWeight:500,color:T.charcoal,marginBottom:6}}>{opt.title}</div>
+                  <div style={{fontSize:13,color:T.muted,lineHeight:1.5}}>{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!preview && mode==='photo' && (
+          <div>
+            <input ref={fileRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={addPhotos}/>
+            {photos.length===0?(
+              <div onClick={()=>fileRef.current.click()} style={{border:`2px dashed ${T.border}`,borderRadius:16,padding:'56px 24px',textAlign:'center',cursor:'pointer',background:T.offWhite,marginBottom:20}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.brass}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <div style={{fontSize:48,marginBottom:12}}>📷</div>
+                <p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:20,color:T.charcoal,marginBottom:6}}>Tap to take a photo</p>
+                <p style={{fontSize:13,color:T.muted}}>Recipe card, cookbook page, screenshot — anything works</p>
+              </div>
+            ):(
+              <div style={{marginBottom:16}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:12}}>
+                  {photos.map((ph,i)=>(
+                    <div key={i} style={{position:'relative',aspectRatio:'1',borderRadius:10,overflow:'hidden'}}>
+                      <img src={ph.src} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      <button onClick={()=>setPhotos(prev=>prev.filter((_,idx)=>idx!==i))} style={{position:'absolute',top:5,right:5,width:24,height:24,background:'rgba(0,0,0,.6)',border:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                        <Icon name="close" size={12} color={T.white}/>
+                      </button>
+                    </div>
+                  ))}
+                  <div onClick={()=>fileRef.current.click()} style={{aspectRatio:'1',borderRadius:10,border:`2px dashed ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:T.offWhite}}>
+                    <Icon name="plus" size={24} color={T.brass}/>
+                  </div>
+                </div>
+              </div>
+            )}
+            {error&&<div style={{background:'rgba(239,154,154,.1)',border:'1px solid rgba(239,154,154,.3)',borderRadius:10,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#EF9A9A',lineHeight:1.5}}>{error}</div>}
+            {loading&&<div style={{background:T.charcoal,borderRadius:14,padding:'32px 24px',textAlign:'center',marginBottom:16}}><LoadingDots/><p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:17,color:T.white,marginTop:14}}>Reading your recipe…</p></div>}
+            {photos.length>0&&!loading&&<button className="btn-brass" onClick={importFromPhotos} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:12}}><Icon name="sparkle" size={16} color={T.white}/> Read Recipe from Photo{photos.length>1?'s':''}</button>}
+            <button className="btn-ghost" onClick={()=>{setMode('choice');setPhotos([]);setError('')}} style={{width:'100%'}}>Back</button>
+          </div>
+        )}
+
+        {!preview && mode==='text' && (
+          <div>
+            <p style={{fontSize:13,color:T.muted,marginBottom:14,lineHeight:1.6}}>Paste a recipe from a website, email, or message — any format works. AI will clean it up.</p>
+            <textarea className="input-field" placeholder={"Paste recipe text here…\n\nExample:\nMom's Chicken Soup\n- 1 whole chicken\n- 3 carrots…"} value={pasteText} onChange={e=>setPasteText(e.target.value)} rows={10} style={{resize:'none',lineHeight:1.6,fontSize:14,marginBottom:16}}/>
+            {error&&<div style={{background:'rgba(239,154,154,.1)',border:'1px solid rgba(239,154,154,.3)',borderRadius:10,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#EF9A9A',lineHeight:1.5}}>{error}</div>}
+            {loading&&<div style={{background:T.charcoal,borderRadius:14,padding:'32px 24px',textAlign:'center',marginBottom:16}}><LoadingDots/><p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:17,color:T.white,marginTop:14}}>Formatting your recipe…</p></div>}
+            {!loading&&<button className="btn-brass" onClick={importFromText} disabled={!pasteText.trim()} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:12}}><Icon name="sparkle" size={16} color={T.white}/> Import Recipe</button>}
+            <button className="btn-ghost" onClick={()=>{setMode('choice');setPasteText('');setError('')}} style={{width:'100%'}}>Back</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const CreateRecipeForm = ({onSave, onClose}) => {
   const [title,setTitle]=useState('')
   const [description,setDescription]=useState('')
@@ -1098,7 +1281,7 @@ const getRandomSuggestions = () => {
   return shuffled.slice(0, 6)
 }
 
-const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4}) => {
+const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, allergens=[], defaultServings=4}) => {
   const [prompt,setPrompt]=useState('')
   const [loading,setLoading]=useState(false)
   const [generated,setGenerated]=useState(null)
@@ -1106,6 +1289,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4
   const [error,setError]=useState('')
   const [showChat,setShowChat]=useState(false)
   const [showCreate,setShowCreate]=useState(false)
+  const [showImport,setShowImport]=useState(false)
   const [suggestions] = useState(getRandomSuggestions)
 
   const generate=async(text)=>{
@@ -1129,6 +1313,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4
     <div style={{height:'100%',overflow:'auto',background:T.white}}>
       {showChat&&generated&&<RecipeChatPanel recipe={generated} onRecipeUpdate={handleUpdate} onClose={()=>setShowChat(false)}/>}
       {showCreate&&<CreateRecipeForm onSave={async(r)=>{await onAddRecipe(r)}} onClose={()=>setShowCreate(false)}/>}
+      {showImport&&<ImportRecipeModal onSave={async(r)=>{await onFavorite(r)}} onClose={()=>setShowImport(false)}/>}
 
       <div style={{background:T.charcoal,padding:'32px 24px 24px',borderBottom:`1px solid ${T.border}`}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
@@ -1136,9 +1321,14 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, allergens=[], defaultServings=4
             <Icon name="sparkle" size={20} color={T.brass}/>
             <h2 style={{fontFamily:"'Cormorant Garamond'",fontSize:28,fontWeight:400,color:T.white}}>Discover Recipes</h2>
           </div>
-          <button onClick={()=>setShowCreate(true)} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'7px 14px',color:T.brass,fontSize:12,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
-            <Icon name="plus" size={13} color={T.brass}/>Create Own
-          </button>
+          <div style={{display:'flex',gap:8,flexShrink:0}}>
+            <button onClick={()=>setShowImport(true)} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'7px 12px',color:T.brass,fontSize:12,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+              📷 Import
+            </button>
+            <button onClick={()=>setShowCreate(true)} style={{background:'none',border:`1px solid ${T.border}`,borderRadius:8,padding:'7px 12px',color:T.brass,fontSize:12,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+              <Icon name="plus" size={13} color={T.brass}/>Create
+            </button>
+          </div>
         </div>
         <p style={{fontSize:13,color:T.muted}}>Ask AI for any recipe you're craving</p>
         {allergens.length>0&&(
@@ -1812,7 +2002,7 @@ export default function App() {
   return shell(<>
     <div style={{height:3,background:`linear-gradient(90deg,${T.brass},${T.brassDark},${T.brass})`,flexShrink:0}}/>
     <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-      {activeTab==='discover'&&<DiscoverTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} allergens={allergens} defaultServings={defaultServings}/>}
+      {activeTab==='discover'&&<DiscoverTab onAddRecipe={addRecipe} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} allergens={allergens} defaultServings={defaultServings}/>}
       {activeTab==='favorites'&&<FavoritesTab favorites={favorites} recipes={recipes} menus={menus} onOpenRecipe={setViewingRecipe} onFavorite={handleFavorite} onCreateMenu={createMenu} onDeleteMenu={deleteMenu} onUpdate={handleUpdate}/>}
       {activeTab==='planner'&&<MealPlannerTab plan={plan} weekStart={weekStart} onAssign={assignRecipe} onClear={clearSlot} onGoWeek={goToWeek} favorites={favorites} onAddToList={addItems}/>}
       {activeTab==='shopping'&&<ShoppingListTab items={shoppingItems} onToggle={toggleItem} onRemove={removeItem} onClearChecked={clearChecked} onClearAll={clearAll}/>}
