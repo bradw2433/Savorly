@@ -1331,7 +1331,7 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, all
             </button>
           </div>
         </div>
-        <p style={{fontSize:13,color:T.muted}}>Ask AI for any recipe you're craving</p>
+        <p style={{fontSize:13,color:T.muted}}>What are you craving tonight?</p>
         {allergens.length>0&&(
           <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,background:'rgba(168,160,144,.15)',border:`1px solid ${T.border}`,borderRadius:20,padding:'5px 12px',width:'fit-content'}}>
             <Icon name="shield" size={13} color={T.brass}/>
@@ -1351,36 +1351,63 @@ const DiscoverTab = ({onAddRecipe, onOpenRecipe, onFavorite, onAddToPlanner, all
           </button>
         </div>
 
+        <div style={{fontSize:10,fontWeight:600,letterSpacing:'.14em',textTransform:'uppercase',color:T.muted,marginBottom:8,fontFamily:"'Jost',sans-serif"}}>Quick picks</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
           {suggestions.map(s=>(
             <button key={s} onClick={()=>generate(s)} style={{background:T.offWhite,border:`1px solid ${T.borderLight}`,borderRadius:20,padding:'6px 14px',fontSize:12,color:T.charcoal,transition:'all .2s'}}>{s}</button>
           ))}
         </div>
 
-        {/* Budget button */}
-        <button onClick={()=>{
-          const meals=['Rice and beans with cumin-lime dressing','Pasta with garlic and olive oil','Lentil soup with spinach and lemon','Potato and egg hash','Chickpea coconut curry','Fried rice with vegetables and soy sauce','Black bean quesadillas','Tomato soup with grilled cheese','Spaghetti with marinara sauce','Omelette with whatever vegetables you have','Banana oat pancakes','Peanut butter noodles with cucumber','Tuna pasta salad','Bean and cheese burrito','Veggie stir fry with rice']
-          const pick=meals[Math.floor(Math.random()*meals.length)]
-          const budgetSys=RECIPE_SYS+allergenPromptText(allergens,defaultServings)+'\n\nThis must be a BUDGET-FRIENDLY recipe using inexpensive, everyday ingredients. Total cost should be under $10 to feed the family. Prioritize pantry staples, beans, rice, pasta, eggs, and affordable produce.'
-          setLoading(true);setSaved(false);setGenerated(null);setError('');setShowChat(false)
-          callClaude([{role:'user',content:`Create a budget-friendly recipe for: ${pick}`}],budgetSys)
-            .then(raw=>setGenerated({id:Date.now(),raw,photos:[],rating:0,createdAt:new Date().toISOString()}))
-            .catch(e=>setError(e.message||'Could not generate recipe.'))
-            .finally(()=>setLoading(false))
-        }} style={{
-          width:'100%',marginBottom:28,padding:'12px 20px',
-          background:'transparent',
-          border:`1.5px solid ${T.border}`,
-          borderRadius:10,cursor:'pointer',
-          display:'flex',alignItems:'center',justifyContent:'center',gap:10,
-          fontSize:13,fontWeight:500,color:T.charcoal,
-          transition:'all .2s',
-        }}
-        onMouseEnter={e=>{e.currentTarget.style.background=T.brassGlow;e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.color=T.brassDark}}
-        onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.charcoal}}>
-          <span style={{fontSize:18}}>💰</span>
-          <span>Surprise me with a budget-friendly meal</span>
-        </button>
+        {/* Quick launch category cards */}
+        {(() => {
+          const quickLaunch = [
+            {
+              emoji:'💰', label:'Budget Friendly', sub:'Under $10 to feed the family',
+              meals:['Rice and beans with cumin-lime dressing','Pasta with garlic and olive oil','Lentil soup with spinach and lemon','Potato and egg hash','Chickpea coconut curry','Fried rice with vegetables and soy sauce','Black bean quesadillas','Spaghetti with marinara sauce','Tuna pasta salad','Bean and cheese burrito'],
+              sys:'\n\nThis must be a BUDGET-FRIENDLY recipe using inexpensive everyday ingredients. Total cost should be under $10 to feed the family. Prioritize pantry staples, beans, rice, pasta, eggs, and affordable produce.',
+            },
+            {
+              emoji:'⚡', label:'30 Min or Less', sub:'Fast weeknight dinner',
+              meals:['Shrimp stir fry with noodles','Chicken quesadillas','Garlic butter pasta','Taco bowls','Sesame noodles','Sheet pan sausage and vegetables','Egg fried rice','Turkey lettuce wraps','Pesto tortellini','Teriyaki salmon'],
+              sys:'\n\nThis must be a QUICK recipe ready in 30 minutes or less from start to finish. Keep steps simple and efficient. Total cook and prep time must be 30 minutes or under.',
+            },
+            {
+              emoji:'🍰', label:'Dessert', sub:'Something sweet to finish',
+              meals:['Chocolate lava cake','Classic crème brûlée','Banana foster','Strawberry shortcake','Tiramisu','Apple crumble','Chocolate mousse','Lemon tart','Cheesecake bars','Panna cotta'],
+              sys:'\n\nThis is a DESSERT recipe. Create a beautiful, indulgent sweet dish. Focus on flavor, texture, and presentation. Include any special techniques that make the dessert extra special.',
+            },
+            {
+              emoji:'🍳', label:'Breakfast & Brunch', sub:'Morning favorites',
+              meals:['Eggs Benedict with hollandaise','French toast with berries','Smoked salmon bagels','Shakshuka','Buttermilk pancakes','Avocado toast with poached eggs','Quiche lorraine','Breakfast burritos','Banana walnut waffles','Vegetable frittata'],
+              sys:'\n\nThis is a BREAKFAST or BRUNCH recipe. Create a delicious morning dish that feels special and satisfying. Focus on classic morning flavors done beautifully.',
+            },
+          ]
+          return (
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:28}}>
+              {quickLaunch.map(q=>(
+                <button key={q.label} onClick={()=>{
+                  const pick=q.meals[Math.floor(Math.random()*q.meals.length)]
+                  const sys=RECIPE_SYS+allergenPromptText(allergens,defaultServings)+q.sys
+                  setLoading(true);setSaved(false);setGenerated(null);setError('');setShowChat(false)
+                  callClaude([{role:'user',content:`Create a recipe for: ${pick}`}],sys)
+                    .then(raw=>setGenerated({id:Date.now(),raw,photos:[],rating:0,createdAt:new Date().toISOString()}))
+                    .catch(e=>setError(e.message||'Could not generate recipe.'))
+                    .finally(()=>setLoading(false))
+                }} style={{
+                  background:T.charcoal,border:`1px solid ${T.borderLight}`,
+                  borderRadius:14,padding:'16px 14px',textAlign:'left',
+                  cursor:'pointer',transition:'all .2s',
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=T.brass;e.currentTarget.style.background='#1e1e1c'}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderLight;e.currentTarget.style.background=T.charcoal}}>
+                  <div style={{fontSize:24,marginBottom:8}}>{q.emoji}</div>
+                  <div style={{fontSize:13,fontWeight:500,color:T.white,marginBottom:3,fontFamily:"'Cormorant Garamond'",fontSize:16}}>{q.label}</div>
+                  <div style={{fontSize:11,color:T.muted,lineHeight:1.4}}>{q.sub}</div>
+                </button>
+              ))}
+            </div>
+          )
+        })()}
 
         {loading&&<div style={{background:T.charcoal,borderRadius:16,padding:'36px 24px',textAlign:'center',marginBottom:24}}><LoadingDots/><p style={{fontFamily:"'Cormorant Garamond'",fontStyle:'italic',fontSize:18,color:T.white,marginTop:16}}>Crafting your recipe…</p></div>}
         {error&&<div style={{background:'rgba(239,154,154,.1)',border:'1px solid rgba(239,154,154,.3)',borderRadius:10,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#EF9A9A'}}>{error}</div>}
